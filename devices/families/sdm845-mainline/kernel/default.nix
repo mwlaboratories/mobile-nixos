@@ -207,6 +207,6 @@ mobile-nixos.kernel-builder {
   '';
 
   isModular = true;
-  modDirVersion = "6.19.0-rc4-sdm845";
+  modDirVersion = "6.19.0-rc4-next-20260106";
   isCompressed = "gz";
 }
