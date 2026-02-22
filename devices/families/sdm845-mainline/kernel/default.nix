@@ -194,8 +194,8 @@ mobile-nixos.kernel-builder {
 
   nativeBuildInputs = [ buildPackages.python3 buildPackages.zstd ];
 
-  # Don't use zinstall, it expects EFI boot files which ARM64 doesn't generate
-  installTargets = [ ];
+  # Skip "install" (zinstall for boot files) but keep modules_install (runs depmod)
+  installTargets = [ "modules_install" ];
 
   postInstall = ''
     # Manually copy the kernel image
