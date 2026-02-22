@@ -183,7 +183,7 @@ let
 in
 
 mobile-nixos.kernel-builder {
-  version = "6.19.0-rc4-next-20260106-sdm845";
+  version = "6.19.0-rc4-next-20260106";
   configfile = configfile;
   src = kernelSrc;
 
