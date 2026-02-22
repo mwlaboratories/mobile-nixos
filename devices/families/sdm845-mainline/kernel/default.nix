@@ -168,6 +168,28 @@ let
       CONFIG_HID_SENSOR_PROX=y
 
       CONFIG_GPIO_SHARED_PROXY=y
+
+      # Touchscreen (RMI4) — must be built-in since isModular=false
+      CONFIG_RMI4_CORE=y
+      CONFIG_RMI4_I2C=y
+      CONFIG_RMI4_F03=y
+      CONFIG_RMI4_F11=y
+      CONFIG_RMI4_F12=y
+      CONFIG_RMI4_F30=y
+      CONFIG_RMI4_F34=y
+      CONFIG_RMI4_F55=y
+      CONFIG_HID_RMI=y
+
+      # WiFi (ath10k SNOC for SDM845) — must be built-in since isModular=false
+      CONFIG_WLAN=y
+      CONFIG_CFG80211=y
+      CONFIG_MAC80211=y
+      CONFIG_ATH10K=y
+      CONFIG_ATH10K_CE=y
+      CONFIG_ATH10K_SNOC=y
+      CONFIG_ATH10K_COREDUMP=y
+      CONFIG_FW_LOADER=y
+      CONFIG_FW_LOADER_USER_HELPER=y
       EOF
 
             # Run olddefconfig to resolve dependencies
