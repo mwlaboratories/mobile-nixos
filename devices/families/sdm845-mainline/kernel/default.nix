@@ -8,6 +8,8 @@
 }:
 
 let
+  version = "6.19.0-rc4-next-20260106";
+
   kernelSrc = fetchFromGitea {
     domain = "codeberg.org";
     owner = "sdm845";
@@ -186,13 +188,13 @@ let
 in
 
 mobile-nixos.kernel-builder {
-  version = "6.19.0-rc4-next-20260106";
+  inherit version;
   configfile = configfile;
   src = kernelSrc;
 
   patches = [ ];
 
-  nativeBuildInputs = [ buildPackages.python3 buildPackages.zstd ];
+  nativeBuildInputs = [ buildPackages.python3 buildPackages.zstd buildPackages.kmod ];
 
   # Skip "install" (zinstall for boot files) but keep modules_install (runs depmod)
   installTargets = [ "modules_install" ];
@@ -204,9 +206,14 @@ mobile-nixos.kernel-builder {
 
     # Create symlink for compatibility
     ln -sv Image.gz "$out/vmlinuz" || true
+
+    # Explicitly run depmod to generate modules.dep, modules.alias, etc.
+    # Cross-compilation causes make modules_install's depmod to silently fail.
+    echo ":: Running depmod to generate module dependency files"
+    depmod -b "$out" -F "$buildRoot/System.map" "${version}"
   '';
 
   isModular = true;
-  modDirVersion = "6.19.0-rc4-next-20260106";
+  modDirVersion = version;
   isCompressed = "gz";
 }
