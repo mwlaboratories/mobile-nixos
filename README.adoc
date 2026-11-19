@@ -17,7 +17,8 @@ and an option to generate Android sparse images.
 `mobile.boot.stage-1.kernel.buildOn = "x86_64-linux";` cross-compiles the device kernel on a PC while everything else comes from the binary cache.
 For the OnePlus 6 it adds firmware paths under the board name, a stable Bluetooth public address,
 sensors via hexagonrpcd and iio-sensor-proxy (SSC), an optional stage-2 USB gadget (NCM network and ACM serial),
-a stable default WiFi MAC address, and ModemManager at boot.
+a stable default WiFi MAC address, ModemManager at boot,
+and camera access for libcamera's software ISP.
 
 The `main` branch tracks upstream `development` with these changes on top, and upstream is merged in periodically.
 These changes are not reviewed upstream and may be rough or temporary; some commits are explicitly marked `HACK`.
