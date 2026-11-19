@@ -1,0 +1,69 @@
+From: mwlaboratories <info@mwlabs.be>
+Subject: [PATCH] Input: pm8941-pwrkey - drop repeated release after wakeup
+
+A power key press that wakes the phone from s2idle is reported twice:
+systemd-logind logs "Power key pressed short." two times for the one
+press, and GNOME acts on the second one.
+
+The interrupt is dual-edge. When the key wakes the system, the handler
+runs after the key is already up, once for the replayed wakeup interrupt
+and again for the release edge. Both read a released key with no press
+reported before, and since "simulate missed key press events" each such
+run reports a press and a release.
+
+Treat a release without press that comes within 500 ms of the previous
+release as a repeat and drop it. A live press is handled while the key is
+down, so runtime presses, double taps included, are unaffected.
+
+Status: hypothesis until tested on the OnePlus 6 (pm8998).
+---
+--- a/drivers/input/misc/pm8941-pwrkey.c	2026-11-19 17:08:15.165802312 +0100
++++ b/drivers/input/misc/pm8941-pwrkey.c	2026-11-19 17:08:37.047348130 +0100
+@@ -54,6 +54,12 @@
+ #define  PON_DBC_SHIFT_GEN1		6
+ #define  PON_DBC_SHIFT_GEN2		14
+ 
++/*
++ * A release seen without its press this soon after the previous release is a
++ * second delivery of an edge already reported, not a new key press.
++ */
++#define PON_DUP_RELEASE_WINDOW_MS	500
++
+ struct pm8941_data {
+ 	unsigned int	pull_up_bit;
+ 	unsigned int	status_bit;
+@@ -80,6 +86,7 @@
+ 	u32 code;
+ 	u32 sw_debounce_time_us;
+ 	ktime_t sw_debounce_end_time;
++	ktime_t last_release_time;
+ 	bool last_status;
+ 	const struct pm8941_data *data;
+ };
+@@ -174,12 +181,26 @@
+ 	/*
+ 	 * Simulate a press event in case a release event occurred without a
+ 	 * corresponding press event.
++	 *
++	 * When the key wakes the system, the interrupt can be handled more
++	 * than once after the key is already up (the wakeup interrupt is
++	 * replayed on resume, and the release edge raises it again). Each run
++	 * reads a released key; simulating a press for every one of them
++	 * reports one physical press as two. Drop the repeats.
+ 	 */
+ 	if (!pwrkey->last_status && !sts) {
++		if (ktime_before(ktime_get(),
++				 ktime_add_ms(pwrkey->last_release_time,
++					      PON_DUP_RELEASE_WINDOW_MS))) {
++			dev_dbg(pwrkey->dev, "ignoring repeated release\n");
++			return IRQ_HANDLED;
++		}
+ 		input_report_key(pwrkey->input, pwrkey->code, 1);
+ 		input_sync(pwrkey->input);
+ 	}
+ 	pwrkey->last_status = sts;
++	if (!sts)
++		pwrkey->last_release_time = ktime_get();
+ 
+ 	input_report_key(pwrkey->input, pwrkey->code, sts);
+ 	input_sync(pwrkey->input);

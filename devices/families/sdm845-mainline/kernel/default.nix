@@ -232,6 +232,8 @@ mobile-nixos.kernel-builder {
     ./0002-arm64-dts-qcom-pmi8998-Add-node-for-PMIC-VBUS-booster.patch    # 58270b11
     ./0003-arm64-dts-qcom-sdm845-oneplus-Enable-vbus-support.patch       # a1ad302f
     ./0004-wip-enable-OTG-vbus.patch # 5f71fe8e: dual power role + vbus-supply
+    # A power key press that wakes the phone was reported twice.
+    ./0005-Input-pm8941-pwrkey-drop-repeated-release-after-wake.patch
   ];
 
   nativeBuildInputs = [ buildPackages.python3 buildPackages.zstd buildPackages.kmod ];
