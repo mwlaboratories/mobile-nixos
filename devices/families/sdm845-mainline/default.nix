@@ -67,6 +67,39 @@
 
   mobile.quirks.qualcomm.sdm845-modem.enable = true;
 
+  # The WLAN firmware (WCN3990) runs on the modem. rmtfs (-s) stops the modem
+  # when it stops, at every shutdown and reboot. If ath10k is still sending
+  # then ("failed to transmit packet: -108"), the SoC dies within seconds and
+  # ends in Qualcomm crashdump. On a OnePlus 6: modem stops with Wi-Fi up
+  # crashed on the 3rd; with Wi-Fi off, 10 of 10 survived. Unbind ath10k
+  # before the modem stops (a link down could be undone by NetworkManager,
+  # an rfkill block would be saved by systemd-rfkill), and bind it again
+  # when rmtfs starts the modem again.
+  systemd.services.rmtfs.serviceConfig = let
+    snoc = "/sys/bus/platform/drivers/ath10k_snoc";
+    wifiDown = pkgs.writeShellScript "ath10k-snoc-unbind" ''
+      for dev in ${snoc}/*.*; do
+        [ -e "$dev" ] || continue
+        name=''${dev##*/}
+        echo "rmtfs: unbinding ath10k $name before the modem stops" > /dev/kmsg
+        echo "$name" > ${snoc}/unbind
+      done
+    '';
+    wifiUp = pkgs.writeShellScript "ath10k-snoc-bind" ''
+      [ -d ${snoc} ] || exit 0
+      for dev in /sys/bus/platform/devices/*; do
+        grep -qs wcn3990-wifi "$dev/of_node/compatible" || continue
+        [ -e "$dev/driver" ] && continue
+        echo "''${dev##*/}" > ${snoc}/bind
+      done
+    '';
+  in {
+    # "-": never keep the modem from starting or stopping.
+    ExecStartPre = [ "-${wifiUp}" ];
+    # Runs before the stop signal; rmtfs then stops the modem.
+    ExecStop = [ "-${wifiDown}" ];
+  };
+
   services.udev.extraRules = ''
     SUBSYSTEM=="input", KERNEL=="event*", ENV{ID_INPUT}=="1", SUBSYSTEMS=="input", ATTRS{name}=="pmi8998_haptics", TAG+="uaccess", ENV{FEEDBACKD_TYPE}="vibra"
   '';
