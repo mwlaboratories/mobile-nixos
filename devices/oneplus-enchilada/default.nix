@@ -6,6 +6,7 @@
     ./bluetooth.nix
     ./camera.nix
     ./sensors.nix
+    ./video-codec.nix
   ];
 
   mobile.device.name = "oneplus-enchilada";
