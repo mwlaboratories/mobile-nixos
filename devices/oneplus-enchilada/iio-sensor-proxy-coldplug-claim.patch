@@ -1,0 +1,18 @@
+--- a/src/iio-sensor-proxy.c
++++ b/src/iio-sensor-proxy.c
+@@ -779,6 +779,15 @@
+ 		}
+ 
+ 		DEVICE_FOR_TYPE(i) = sensor_device;
++
++		/* A client may have claimed this sensor while the drivers were
++		 * still being opened (the SSC driver runs a nested main loop),
++		 * and that claim was only recorded. Start the sensor now, as
++		 * sensor_changes() does for hotplugged sensors. */
++		if (g_hash_table_size (data->clients[i]) > 0) {
++			data->sensor_startup_dbus_event_delayed[i] = TRUE;
++			driver_set_polling (sensor_device, TRUE);
++		}
+ 	}
+ 
+ 	if (!any_sensors_left (data))

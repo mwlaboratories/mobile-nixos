@@ -32,6 +32,16 @@ in
   # and ssc-compass.
   hardware.sensor.iio.enable = lib.mkDefault true;
 
+  # At boot the GDM greeter claims the accelerometer as soon as
+  # net.hadess.SensorProxy appears, while the SSC driver is still opening
+  # sensors in a nested main loop. The claim is recorded but the sensor is
+  # never started (only the hotplug path checks for waiting clients), so
+  # orientation stays "undefined". The patch starts already-claimed sensors
+  # right after they are opened.
+  hardware.sensor.iio.package = lib.mkDefault (pkgs.iio-sensor-proxy.overrideAttrs (old: {
+    patches = (old.patches or [ ]) ++ [ ./iio-sensor-proxy-coldplug-claim.patch ];
+  }));
+
   users.groups.fastrpc = { };
   users.users.fastrpc = {
     isSystemUser = true;
