@@ -3,6 +3,7 @@
 {
   imports = [
     ../families/sdm845-mainline
+    ./bluetooth.nix
   ];
 
   mobile.device.name = "oneplus-enchilada";
