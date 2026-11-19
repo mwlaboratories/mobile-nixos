@@ -253,8 +253,10 @@ in
         module = yes;
       in {
         ANDROID = whenBetween "3.19" "6.0" yes;
-        ANDROID_BINDER_IPC = whenAtLeast "3.19" yes;
-        ANDROID_BINDERFS = whenAtLeast "5.0" yes;
+        # The C binder (and its binderfs symbol) is gone by 7.4; only the Rust
+        # driver (ANDROID_BINDER_IPC_RUST, needs CONFIG_RUST) remains.
+        ANDROID_BINDER_IPC = whenBetween "3.19" "7.4" yes;
+        ANDROID_BINDERFS = whenBetween "5.0" "7.4" yes;
         PSI = whenAtLeast "4.20" yes;
 
         # Needed for waydroid networking to function

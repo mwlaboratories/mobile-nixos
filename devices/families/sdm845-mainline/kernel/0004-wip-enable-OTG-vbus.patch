@@ -1,0 +1,99 @@
+From 5f71fe8ec51e7592c0c90858416eadf855e7c835 Mon Sep 17 00:00:00 2001
+From: David Heidelberg <david@ixit.cz>
+Date: Tue, 27 Oct 2026 23:51:31 +0100
+Subject: [PATCH] wip! enable OTG vbus
+
+Signed-off-by: David Heidelberg <david@ixit.cz>
+---
+ arch/arm64/boot/dts/qcom/sdm845-google-common.dtsi  | 11 +++++++++--
+ arch/arm64/boot/dts/qcom/sdm845-oneplus-common.dtsi | 11 +++++++++--
+ arch/arm64/boot/dts/qcom/sdm845-shift-axolotl.dts   | 11 +++++++++--
+ 3 files changed, 27 insertions(+), 6 deletions(-)
+
+diff --git a/arch/arm64/boot/dts/qcom/sdm845-google-common.dtsi b/arch/arm64/boot/dts/qcom/sdm845-google-common.dtsi
+index 125b7d2d2b3e..51815b335c9f 100644
+--- a/arch/arm64/boot/dts/qcom/sdm845-google-common.dtsi
++++ b/arch/arm64/boot/dts/qcom/sdm845-google-common.dtsi
+@@ -872,15 +872,22 @@
+ 		 * Higher voltage sink PDOs will be added once the charger
+ 		 * driver programs the allowed USBIN adapter voltage.
+ 		 */
+-		power-role = "sink";
++		power-role = "dual";
+ 		data-role = "dual";
+-		self-powered;
++		try-power-role = "sink";
+ 
++		source-pdos = <PDO_FIXED(5000, 3000,
++					 PDO_FIXED_DUAL_ROLE |
++					 PDO_FIXED_USB_COMM |
++					 PDO_FIXED_DATA_SWAP)>;
+ 		sink-pdos = <PDO_FIXED(5000, 3000,
++				       PDO_FIXED_DUAL_ROLE |
+ 				       PDO_FIXED_USB_COMM |
+ 				       PDO_FIXED_DATA_SWAP)>;
+ 		op-sink-microwatt = <7600000>;
+ 
++		vbus-supply = <&pmi8998_vbus>;
++
+ 		ports {
+ 			#address-cells = <1>;
+ 			#size-cells = <0>;
+diff --git a/arch/arm64/boot/dts/qcom/sdm845-oneplus-common.dtsi b/arch/arm64/boot/dts/qcom/sdm845-oneplus-common.dtsi
+index 287c4c529937..b0b508f34659 100644
+--- a/arch/arm64/boot/dts/qcom/sdm845-oneplus-common.dtsi
++++ b/arch/arm64/boot/dts/qcom/sdm845-oneplus-common.dtsi
+@@ -932,15 +932,22 @@
+ 		 * source PDOs, try-power-role and vbus-supply once it is
+ 		 * supported.
+ 		 */
+-		power-role = "sink";
++		power-role = "dual";
+ 		data-role = "dual";
+-		self-powered;
++		try-power-role = "sink";
+ 
++		source-pdos = <PDO_FIXED(5000, 3000,
++					 PDO_FIXED_DUAL_ROLE |
++					 PDO_FIXED_USB_COMM |
++					 PDO_FIXED_DATA_SWAP)>;
+ 		sink-pdos = <PDO_FIXED(5000, 3000,
++				       PDO_FIXED_DUAL_ROLE |
+ 				       PDO_FIXED_USB_COMM |
+ 				       PDO_FIXED_DATA_SWAP)>;
+ 		op-sink-microwatt = <15000000>;
+ 
++		vbus-supply = <&pmi8998_vbus>;
++
+ 		ports {
+ 			#address-cells = <1>;
+ 			#size-cells = <0>;
+diff --git a/arch/arm64/boot/dts/qcom/sdm845-shift-axolotl.dts b/arch/arm64/boot/dts/qcom/sdm845-shift-axolotl.dts
+index 8a792c92ad6f..2605eefcfed8 100644
+--- a/arch/arm64/boot/dts/qcom/sdm845-shift-axolotl.dts
++++ b/arch/arm64/boot/dts/qcom/sdm845-shift-axolotl.dts
+@@ -1015,15 +1015,22 @@
+ 		 * DisplayPort Alt Mode will be added together with enabling
+ 		 * the DP controller (mdss_dp).
+ 		 */
+-		power-role = "sink";
++		power-role = "dual";
+ 		data-role = "dual";
+-		self-powered;
++		try-power-role = "sink";
+ 
++		source-pdos = <PDO_FIXED(5000, 3000,
++					 PDO_FIXED_DUAL_ROLE |
++					 PDO_FIXED_USB_COMM |
++					 PDO_FIXED_DATA_SWAP)>;
+ 		sink-pdos = <PDO_FIXED(5000, 3000,
++				       PDO_FIXED_DUAL_ROLE |
+ 				       PDO_FIXED_USB_COMM |
+ 				       PDO_FIXED_DATA_SWAP)>;
+ 		op-sink-microwatt = <15000000>;
+ 
++		vbus-supply = <&pmi8998_vbus>;
++
+ 		altmodes {
+ 			displayport {
+ 				svid = /bits/ 16 <0xff01>;

@@ -8,14 +8,16 @@
 }:
 
 let
-  version = "6.19.0-rc4-next-20260106";
+  # sdm845-linus (7.4-rc3). The final kernel.release has no "-sdm845" suffix
+  # (the build checks modDirVersion against it).
+  version = "7.4.0-rc3";
 
   kernelSrc = fetchFromGitea {
     domain = "codeberg.org";
     owner = "sdm845";
     repo = "linux";
-    rev = "dc7b19cffd9ef96b28da5441061ff26dce1025a6";
-    hash = "sha256-5DJ/G7I193TVnVn08dA0UYtzSf6g/Us6/ep8DCaFAdQ=";
+    rev = "9d9c6b9f92ec0cd90290544fefb2ce9106765b7f"; # branch sdm845-linus, 2026-09-02
+    hash = "sha256-r48PDv5R7Kex+M36KQR8kj/cJg9Xf+tQ6Vzy6mX54Y0=";
   };
 
   configfile = stdenv.mkDerivation {
@@ -74,9 +76,6 @@ let
       CONFIG_BLK_DEV_INITRD=y
       CONFIG_BINFMT_ELF=y
       CONFIG_UNIX=y
-
-      # Android/Mobile specific
-      CONFIG_ANDROID_BINDERFS=y
 
       # Networking and netfilter
       CONFIG_XFRM=y
@@ -178,6 +177,34 @@ let
 
       CONFIG_GPIO_SHARED_PROXY=y
 
+      # Display/GPU/video clock controllers must be built in: as modules (the
+      # 7.4 default) they load from the rootfs after the 10 s deferred-probe
+      # timeout, so arm-smmu 5040000 and msm-mdss fail with -110 and there is
+      # no /dev/dri. Built in on 6.19, where the display worked.
+      CONFIG_SDM_GPUCC_845=y
+      CONFIG_SDM_DISPCC_845=y
+      CONFIG_SDM_VIDEOCC_845=y
+
+      # Game/drone controllers over USB-OTG and Bluetooth. Dropped from the 7.4
+      # defconfig; generic HID alone misses joydev, xpad, uhid (BLE HID) and
+      # the vendor drivers (rumble, LEDs, gyro, Joy-Con pairing).
+      CONFIG_INPUT_JOYSTICK=y
+      CONFIG_JOYSTICK_XPAD=m
+      CONFIG_JOYSTICK_XPAD_FF=y
+      CONFIG_INPUT_JOYDEV=m
+      CONFIG_UHID=m
+      CONFIG_HID_SONY=m
+      CONFIG_SONY_FF=y
+      CONFIG_HID_PLAYSTATION=m
+      CONFIG_PLAYSTATION_FF=y
+      CONFIG_HID_NINTENDO=m
+      CONFIG_NINTENDO_FF=y
+      CONFIG_HID_STEAM=m
+      CONFIG_HID_MICROSOFT=m
+      CONFIG_HID_LOGITECH=m
+      CONFIG_HID_LOGITECH_DJ=m
+      CONFIG_HID_LOGITECH_HIDPP=m
+
       # Disable LOCALVERSION_AUTO to make modDirVersion predictable
       CONFIG_LOCALVERSION_AUTO=n
       EOF
@@ -199,7 +226,13 @@ mobile-nixos.kernel-builder {
   configfile = configfile;
   src = kernelSrc;
 
-  patches = [ ];
+  patches = [
+    # OTG VBUS from sdm845-next, in dependency order:
+    ./0001-regulator-qcom_usb_vbus-Add-support-for-pmi8998.patch          # 8f646712
+    ./0002-arm64-dts-qcom-pmi8998-Add-node-for-PMIC-VBUS-booster.patch    # 58270b11
+    ./0003-arm64-dts-qcom-sdm845-oneplus-Enable-vbus-support.patch       # a1ad302f
+    ./0004-wip-enable-OTG-vbus.patch # 5f71fe8e: dual power role + vbus-supply
+  ];
 
   nativeBuildInputs = [ buildPackages.python3 buildPackages.zstd buildPackages.kmod ];
 
