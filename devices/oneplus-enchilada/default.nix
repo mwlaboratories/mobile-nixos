@@ -38,5 +38,8 @@
     '') // { compressFirmware = false; })
   ];
 
+  # NCM network (172.16.42.1) + ACM serial console once booted.
+  mobile.usb.stage-2.enable = lib.mkDefault true;
+
   mobile.system.android.device_name = "OnePlus6";
 }

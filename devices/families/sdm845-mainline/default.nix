@@ -63,6 +63,7 @@
     mass_storage = "mass_storage.0";
     rndis = "rndis.usb0";
   };
+  mobile.usb.stage-2.udc = lib.mkDefault "a600000.usb";
 
   mobile.quirks.qualcomm.sdm845-modem.enable = true;
 
