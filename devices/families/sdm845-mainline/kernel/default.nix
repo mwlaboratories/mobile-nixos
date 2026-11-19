@@ -22,6 +22,10 @@ let
     name = "sdm845-kernel-config";
     src = kernelSrc;
 
+    # Host tools (fixdep, kconfig) need a compiler for the build platform. In a
+    # cross set buildPackages.gcc is the *cross* gcc, so add the native one.
+    depsBuildBuild = [ buildPackages.stdenv.cc ];
+
     nativeBuildInputs = [
       buildPackages.gnumake
       buildPackages.gcc
@@ -34,6 +38,9 @@ let
 
     buildPhase = ''
             export ARCH=arm64
+            # Kconfig probes $CC for options: probe the target compiler.
+            # Empty prefix on a native (or emulated) build.
+            export CROSS_COMPILE=${stdenv.cc.targetPrefix}
             export KCONFIG_CONFIG=$PWD/.config
 
             # Start with defconfig
