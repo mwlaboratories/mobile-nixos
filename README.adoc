@@ -2,6 +2,27 @@
 <div align="center"><a href="https://mobile-nixos.github.io/"><img src="artwork/logo/logo.svg" alt="Mobile NixOS" title="Mobile NixOS" width="500" height="130" /></a></div>
 ++++
 
+[IMPORTANT]
+.This is the mwlaboratories fork, not the official project
+====
+This repository is a personal fork of Mobile NixOS maintained by mwlaboratories.
+The official project lives at link:https://github.com/mobile-nixos/mobile-nixos[github.com/mobile-nixos/mobile-nixos],
+with its website at link:https://mobile-nixos.github.io/[mobile-nixos.github.io].
+
+The fork exists to run a current, fully usable NixOS on the OnePlus 6 (`oneplus-enchilada`, sdm845).
+On top of upstream it carries a mainline sdm845 kernel (currently 7.4-rc3 from the sdm845-linus tree, with OTG VBUS patches)
+and fixes that let its config and module steps cross-compile cleanly.
+Shared modules gain configurable LOCALVERSION and UEVENT_HELPER kernel options, adjusted kernel config validation,
+and an option to generate Android sparse images.
+For the OnePlus 6 it adds firmware paths under the board name, a stable Bluetooth public address,
+sensors via hexagonrpcd and iio-sensor-proxy (SSC), an optional stage-2 USB gadget (NCM network and ACM serial),
+a stable default WiFi MAC address, ModemManager at boot, and suspend disabled.
+
+The `main` branch tracks upstream `development` with these changes on top, and upstream is merged in periodically.
+These changes are not reviewed upstream and may be rough or temporary; some commits are explicitly marked `HACK`.
+For general support, issues, and other devices, please use the upstream project.
+====
+
 *Mobile NixOS* is a superset on top of link:https://nixos.org/nixos/[NixOS Linux],
 link:https://nixos.org/nixpkgs/[Nixpkgs] and link:https://nixos.org/nix/[Nix],
 aiming to abstract away the differences between _mobile_ devices.
@@ -32,6 +53,7 @@ As Mobile NixOS is a superset of NixOS Linux, the following documentation applie
 == Community
 
 Mobile NixOS development and questions is done within the link:https://github.com/mobile-nixos/mobile-nixos[Mobile NixOS GitHub repository].
+(This fork is not that repository; see the notice at the top.)
 
 The following community resources are also available, for NixOS questions.
 
