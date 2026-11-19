@@ -51,9 +51,5 @@
   systemd.services.ModemManager.wantedBy = lib.mkIf config.networking.modemmanager.enable
     (lib.mkDefault [ "multi-user.target" ]);
 
-  # The modem's QMI port does not survive resume, which loses mobile data
-  # and notifications. Screen blanking still saves power.
-  systemd.sleep.settings.Sleep.AllowSuspend = lib.mkDefault false;
-
   mobile.system.android.device_name = "OnePlus6";
 }
