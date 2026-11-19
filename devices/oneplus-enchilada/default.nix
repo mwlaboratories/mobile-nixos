@@ -29,7 +29,21 @@
   # qca/OnePlus/enchilada/crnv21.bin for the Bluetooth NVM), but the firmware
   # package ships it under oneplus6/. Without the Bluetooth NVM, btqca fails
   # with "Failed to download NVM (-2)" and a placeholder 00:00:00:00:5A:AD
-  # address. These links are for stage-2; the stage-1 copy is left unchanged.
+  # address. These links are for stage-2.
+  #
+  # Stage-1 needs the zap shader at the DT path too: msm is built in and
+  # initialises the GPU on the first open of the DRM device (the stage-1 boot
+  # GUI). If the zap shader is missing then, hw init fails with -2 and the GPU
+  # never recovers in stage-2 (software rendering). Copied, not linked, so the
+  # initrd holds a real file.
+  mobile.boot.stage-1.firmware = [
+    (pkgs.runCommand "oneplus-enchilada-initrd-zap" {} ''
+      mkdir -p $out/lib/firmware/qcom/sdm845/OnePlus/enchilada
+      cp -v ${config.mobile.device.firmware}/lib/firmware/qcom/sdm845/oneplus6/a630_zap.mbn \
+        $out/lib/firmware/qcom/sdm845/OnePlus/enchilada/
+    '')
+  ];
+
   hardware.firmware = [
     ((pkgs.runCommand "oneplus-enchilada-firmware-paths" {} ''
       fw=${config.mobile.device.firmware}/lib/firmware
