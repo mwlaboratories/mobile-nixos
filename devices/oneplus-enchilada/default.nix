@@ -41,5 +41,19 @@
   # NCM network (172.16.42.1) + ACM serial console once booted.
   mobile.usb.stage-2.enable = lib.mkDefault true;
 
+  # No factory WiFi MAC reaches mainline (postmarketOS uses bootmac), so the
+  # address is random per boot and DHCP hands out a new lease after each
+  # reboot. "stable" derives one from the machine-id and the connection.
+  networking.networkmanager.wifi.macAddress = lib.mkDefault "stable";
+
+  # Start ModemManager at boot, not only on D-Bus activation (e.g. by a GNOME
+  # greeter): with no graphical session the modem otherwise stays off.
+  systemd.services.ModemManager.wantedBy = lib.mkIf config.networking.modemmanager.enable
+    (lib.mkDefault [ "multi-user.target" ]);
+
+  # The modem's QMI port does not survive resume, which loses mobile data
+  # and notifications. Screen blanking still saves power.
+  systemd.sleep.settings.Sleep.AllowSuspend = lib.mkDefault false;
+
   mobile.system.android.device_name = "OnePlus6";
 }
