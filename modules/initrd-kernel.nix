@@ -29,6 +29,18 @@ let
   );
 
   inherit (config.mobile.quirks) supportsStage-0;
+
+  # Package set the device kernel is called from: the system's own, or the
+  # same nixpkgs and overlays hosted on `buildOn`, cross-compiling to the
+  # device.
+  kernelPkgs =
+    if cfg.buildOn == null then pkgs
+    else import pkgs.path {
+      localSystem = cfg.buildOn;
+      crossSystem = pkgs.stdenv.hostPlatform.system;
+      overlays = config.nixpkgs.overlays;
+    }
+  ;
 in
 {
   # Note: These options are provided  *instead* of `boot.initrd.*`, as we are
@@ -88,6 +100,30 @@ in
         stage-1.
 
         This is not using a kernelPackages attrset, but a kernel derivation directly.
+      '';
+    };
+    buildOn = mkOption {
+      type = types.nullOr types.str;
+      default = null;
+      example = "x86_64-linux";
+      description = ''
+        Compile the device kernel on this system type (cross-compiling)
+        instead of natively or under emulation. Everything else still comes
+        from the binary cache.
+
+        Applies to devices whose kernel is built with
+        `config.mobile.boot.stage-1.kernel.pkgs.callPackage`.
+      '';
+    };
+    pkgs = mkOption {
+      type = types.raw;
+      internal = true;
+      readOnly = true;
+      default = kernelPkgs;
+      defaultText = literalExpression "pkgs, or a cross package set hosted on buildOn";
+      description = ''
+        Package set device kernels are built from with `callPackage`.
+        Honours `mobile.boot.stage-1.kernel.buildOn`.
       '';
     };
     useStrictKernelConfig = mkOption {

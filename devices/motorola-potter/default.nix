@@ -31,7 +31,7 @@ in
   ];
 
   mobile.boot.stage-1.kernel = {
-    package = pkgs.callPackage ./kernel { };
+    package = config.mobile.boot.stage-1.kernel.pkgs.callPackage ./kernel { };
     modular = true;
     modules = [
       # These are modules because postmarketos builds them as

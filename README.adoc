@@ -14,6 +14,7 @@ On top of upstream it carries a mainline sdm845 kernel (currently 7.4-rc3 from t
 and fixes that let its config and module steps cross-compile cleanly.
 Shared modules gain configurable LOCALVERSION and UEVENT_HELPER kernel options, adjusted kernel config validation,
 and an option to generate Android sparse images.
+`mobile.boot.stage-1.kernel.buildOn = "x86_64-linux";` cross-compiles the device kernel on a PC while everything else comes from the binary cache.
 For the OnePlus 6 it adds firmware paths under the board name, a stable Bluetooth public address,
 sensors via hexagonrpcd and iio-sensor-proxy (SSC), an optional stage-2 USB gadget (NCM network and ACM serial),
 a stable default WiFi MAC address, and ModemManager at boot.

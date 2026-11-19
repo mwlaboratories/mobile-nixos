@@ -11,7 +11,7 @@
 
   mobile.boot.stage-1 = {
     compression = "xz";
-    kernel.package = (pkgs.callPackage ./kernel { });
+    kernel.package = (config.mobile.boot.stage-1.kernel.pkgs.callPackage ./kernel { });
   };
 
   hardware.enableRedistributableFirmware = true;
