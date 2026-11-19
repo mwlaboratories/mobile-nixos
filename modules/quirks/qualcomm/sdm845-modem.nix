@@ -136,6 +136,12 @@ in
           fi
           FIRST_PRESENT_SLOT=$(printf "%s" "$QMI_CARDS" | grep "Card state: 'present'" -m1 -B1 | head -n1 | cut -c7-7)
           FIRST_PRESENT_AID=$(printf "%s" "$QMI_CARDS" | grep "usim (2)" -m1 -A3 | tail -n1 | awk '{print $1}')
+          # Without a SIM (or without a USIM application on it) there is no
+          # session to provision; that is not a failure.
+          if [ -z "$FIRST_PRESENT_SLOT" ] || [ -z "$FIRST_PRESENT_AID" ]; then
+              echo "No SIM card with a USIM application found (slot='$FIRST_PRESENT_SLOT', aid='$FIRST_PRESENT_AID'); not provisioning a session."
+              exit 0
+          fi
           $QMICLI_MODEM --uim-change-provisioning-session="slot=$FIRST_PRESENT_SLOT,activate=yes,session-type=primary-gw-provisioning,aid=$FIRST_PRESENT_AID" > /dev/null
         '';
         serviceConfig = {
