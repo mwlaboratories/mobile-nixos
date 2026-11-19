@@ -53,6 +53,16 @@ in
     # Upstream only tags ssc-light/ssc-compass; the SSC on this phone also
     # serves the accelerometer (screen rotation) and proximity sensor.
     SUBSYSTEM=="misc", KERNEL=="fastrpc-sdsp", ENV{IIO_SENSOR_PROXY_TYPE}+="ssc-accel ssc-proximity"
+    # The SSC registry's mount matrix is all zeros here, so libssc passes
+    # the raw axes through (identity), and they point the opposite way to
+    # what iio-sensor-proxy expects: upright portrait reads "bottom-up" and
+    # every orientation comes out rotated 180 degrees. iio-sensor-proxy
+    # applies ACCEL_MOUNT_MATRIX from this device on top of libssc's matrix.
+    # Same matrix postmarketOS uses for most SSC phones (fajita, the 6T,
+    # differs: its y axis is not flipped). Orientation only depends on x and
+    # y; z follows the SSC sign convention. The compass needs no matrix:
+    # SSC computes the heading itself.
+    SUBSYSTEM=="misc", KERNEL=="fastrpc-sdsp", ENV{ACCEL_MOUNT_MATRIX}="-1, 0, 0; 0, -1, 0; 0, 0, -1"
   '';
 
   systemd.services.hexagonrpcd-sdsp = {
