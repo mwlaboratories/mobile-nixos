@@ -1,0 +1,43 @@
+From: mwlaboratories <info@mwlabs.be>
+Subject: [PATCH] firmware: qcom: scm: leave SDI and the dload cookie alone at probe (sdm845)
+
+On the OnePlus 6 (sdm845), every warm restart from Linux 7.4 ends in
+Qualcomm crashdump mode: systemctl reboot, reboot bootloader, with the
+reboot mode cold or warm. The PMIC reports a warm reset by PS_HOLD, so
+the restart was requested normally and the boot firmware chose dload.
+On the same phone, kernel 6.4 restarted fine (journal: next boot 15 s
+later).
+
+At probe, v6.4 wrote the download mode cookie only when download mode
+was requested, and never disabled SDI. Since v6.11 the probe always
+writes "no dump" and, with download mode off, disables SDI
+(SDI_CONFIG 1, 0). Restore the v6.4 probe behaviour; the "no dump" write
+at shutdown is kept, as v6.4 had it.
+
+Status: hypothesis until tested. The SDI disable is the prime suspect.
+---
+--- a/drivers/firmware/qcom/qcom_scm.c	2026-11-19 18:04:14.583593478 +0100
++++ b/drivers/firmware/qcom/qcom_scm.c	2026-11-19 18:06:08.044619367 +0100
+@@ -2841,12 +2841,20 @@
+ 	 * will cause the boot stages to enter download mode, unless
+ 	 * disabled below by a clean shutdown/reboot.
+ 	 */
+-	qcom_scm_set_download_mode(scm, download_mode);
++	/*
++	 * sdm845 (OnePlus 6): at probe, touch the download mode cookie and
++	 * SDI only as v6.4 did (cookie only when download mode is asked for,
++	 * SDI only with qcom,sdi-enabled). On v6.4 warm restarts work; on
++	 * v7.4, with the no-dump write and SDI disable at probe, every warm
++	 * restart (reboot, reboot bootloader) lands in crashdump.
++	 */
++	if (download_mode)
++		qcom_scm_set_download_mode(scm, download_mode);
+ 
+ 	/*
+ 	 * Disable SDI if indicated by DT that it is enabled by default.
+ 	 */
+-	if (of_property_read_bool(pdev->dev.of_node, "qcom,sdi-enabled") || !download_mode)
++	if (of_property_read_bool(pdev->dev.of_node, "qcom,sdi-enabled"))
+ 		qcom_scm_disable_sdi();
+ 
+ 	/*
