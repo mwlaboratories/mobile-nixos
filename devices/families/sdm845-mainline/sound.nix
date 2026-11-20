@@ -33,4 +33,20 @@
   environment.systemPackages = [
     pkgs.sdm845-alsa-ucm
   ];
+
+  # Call audio. The modem's voice stream runs inside the ADSP (q6voice):
+  # the UCM "Voice Call" verb only sets the routes, and the DSP voice
+  # session starts once something opens the VoiceMMode1 PCM for playback
+  # and capture. q6voiced does that while ModemManager reports a call as
+  # dialing, ringing out or active, and closes it when the call ends.
+  # Without it a call connects with no audio either way.
+  #
+  # VoiceMMode1 is PCM 6 on card 0: sdm845-oneplus-common.dtsi (OnePlus 6
+  # and 6T) lists MultiMedia1-6, then VoiceMMode1 (as on postmarketOS).
+  systemd.packages = [ pkgs.q6voiced ];
+  systemd.services.q6voiced.wantedBy = [ "multi-user.target" ];
+  environment.etc."q6voiced/q6voiced.conf".text = ''
+    q6voice_card=0
+    q6voice_device=6
+  '';
 }
