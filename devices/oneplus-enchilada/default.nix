@@ -55,10 +55,22 @@
   ];
 
   # A panic hangs (CONFIG_PANIC_TIMEOUT=0) until a long key press; restart by
-  # itself instead. The reboot mode stays cold: with "reboot=warm", a plain
-  # reboot (no reason written to the PON) ended in Qualcomm crashdump while
-  # "reboot bootloader" did not; kernel 6.4, cold, rebooted fine.
-  boot.kernelParams = [ "panic=10" ];
+  # itself instead.
+  #
+  # TEMPORARY, to catch an early-boot panic (boots that die ~70 s in and
+  # restart through panic=10; ramoops is lost on that reset): with download
+  # mode on, the panic restart lands in Qualcomm crashdump with DDR kept, so
+  # qdl-ramdump (DDRCS0_0) holds the panic record. pstore uncompressed, so
+  # the record reads as plain text in the dump; 64 KiB of log per record.
+  # Clean reboots clear download mode at shutdown and are unaffected; any
+  # crash now waits in crashdump instead of recovering by itself. Drop the
+  # last three once the panic is found.
+  boot.kernelParams = [
+    "panic=10"
+    "qcom_scm.download_mode=full"
+    "pstore.compress=none"
+    "pstore.kmsg_bytes=65536"
+  ];
 
   # NCM network (172.16.42.1) + ACM serial console once booted.
   mobile.usb.stage-2.enable = lib.mkDefault true;
