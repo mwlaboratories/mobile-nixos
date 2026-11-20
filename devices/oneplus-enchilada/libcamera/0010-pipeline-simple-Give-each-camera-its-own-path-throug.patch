@@ -1,0 +1,122 @@
+From 900cc567c442fd73d74425f16ce3f059fabf1086 Mon Sep 17 00:00:00 2001
+From: mwlaboratories <noreply@example.invalid>
+Date: Fri, 20 Nov 2026 16:47:03 +0100
+Subject: [PATCH] pipeline: simple: Give each camera its own path through a
+ crossbar
+
+The simple pipeline handler picks, for every sensor, the first shortest
+path to a video node. On Qualcomm CAMSS every CSIPHY links to every CSID
+and every CSID to every VFE RDI, so all sensors (the OnePlus 6 has three)
+end up on csid0 -> vfe0_rdi0. The pads are only reserved at start(), but
+configure() already reroutes the links and sets the formats:
+
+- configuring camera B while camera A streams fails to set up the links
+  with -EBUSY ("Failed to setup link ... Device or resource busy");
+- configuring camera B while camera A is configured but stopped (a
+  PipeWire node keeps its format while paused) reroutes A's links to B's
+  sensor; when A starts again it streams B's chain with A's buffers and
+  the application gets no image, without any error.
+
+Prefer, among paths of the same length, links to sink pads that the
+cameras created earlier don't use. On CAMSS each sensor then gets its own
+CSID and VFE RDI, and the cameras no longer interfere.
+---
+ src/libcamera/pipeline/simple/simple.cpp | 34 ++++++++++++++++++++----
+ 1 file changed, 29 insertions(+), 5 deletions(-)
+
+diff --git a/src/libcamera/pipeline/simple/simple.cpp b/src/libcamera/pipeline/simple/simple.cpp
+index 2496065..0da2931 100644
+--- a/src/libcamera/pipeline/simple/simple.cpp
++++ b/src/libcamera/pipeline/simple/simple.cpp
+@@ -18,6 +18,7 @@
+ #include <string.h>
+ #include <string>
+ #include <unordered_map>
++#include <unordered_set>
+ #include <utility>
+ #include <vector>
+ 
+@@ -281,7 +282,8 @@ class SimpleCameraData : public Camera::Private
+ public:
+ 	SimpleCameraData(SimplePipelineHandler *pipe,
+ 			 unsigned int numStreams,
+-			 MediaEntity *sensor);
++			 MediaEntity *sensor,
++			 const std::unordered_set<const MediaPad *> &usedPads);
+ 
+ 	bool isValid() const { return sensor_ != nullptr; }
+ 	SimplePipelineHandler *pipe();
+@@ -472,7 +474,8 @@ private:
+ 
+ SimpleCameraData::SimpleCameraData(SimplePipelineHandler *pipe,
+ 				   unsigned int numStreams,
+-				   MediaEntity *sensor)
++				   MediaEntity *sensor,
++				   const std::unordered_set<const MediaPad *> &usedPads)
+ 	: Camera::Private(pipe), streams_(numStreams), rawStream_(nullptr)
+ {
+ 	/*
+@@ -484,6 +487,16 @@ SimpleCameraData::SimpleCameraData(SimplePipelineHandler *pipe,
+ 	 *
+ 	 * For instance, on the IPU-based i.MX6Q, the shortest path will skip
+ 	 * encoders and image converters, and will end in a CSI capture device.
++	 *
++	 * When several paths of the same length exist, prefer the one that
++	 * avoids the sink pads already used by the pipelines of the cameras
++	 * created before this one (usedPads). On devices with a crossbar, such
++	 * as Qualcomm CAMSS where every CSIPHY links to every CSID and every
++	 * CSID to every VFE RDI, the first links otherwise route all sensors
++	 * through the same CSID and RDI. Cameras sharing pads can't stream
++	 * concurrently, and configuring one camera reroutes the shared links
++	 * under the other: the other then starts on the wrong sensor, or the
++	 * link setup fails with -EBUSY while it streams.
+ 	 */
+ 	std::unordered_set<MediaEntity *> visited;
+ 	std::queue<std::tuple<MediaEntity *, MediaPad *>> queue;
+@@ -535,7 +548,13 @@ SimpleCameraData::SimpleCameraData(SimplePipelineHandler *pipe,
+ 		}
+ 
+ 		for (const MediaPad *pad : pads) {
+-			for (MediaLink *link : pad->links()) {
++			std::vector<MediaLink *> links = pad->links();
++			std::stable_partition(links.begin(), links.end(),
++					      [&](const MediaLink *link) {
++						      return !usedPads.count(link->sink());
++					      });
++
++			for (MediaLink *link : links) {
+ 				MediaEntity *next = link->sink()->entity();
+ 				if (visited.find(next) == visited.end()) {
+ 					queue.push({ next, link->sink() });
+@@ -1955,12 +1974,14 @@ bool SimplePipelineHandler::matchDevice(std::shared_ptr<MediaDevice> media,
+ 	 */
+ 	std::vector<std::unique_ptr<SimpleCameraData>> pipelines;
+ 	std::set<MediaEntity *> entities;
++	std::unordered_set<const MediaPad *> usedPads;
+ 
+ 	pipelines.reserve(sensors.size());
+ 
+ 	for (MediaEntity *sensor : sensors) {
+ 		std::unique_ptr<SimpleCameraData> data =
+-			std::make_unique<SimpleCameraData>(this, numStreams, sensor);
++			std::make_unique<SimpleCameraData>(this, numStreams,
++							   sensor, usedPads);
+ 		if (!data->isValid()) {
+ 			LOG(SimplePipeline, Error)
+ 				<< "No valid pipeline for sensor '"
+@@ -1968,8 +1989,11 @@ bool SimplePipelineHandler::matchDevice(std::shared_ptr<MediaDevice> media,
+ 			continue;
+ 		}
+ 
+-		for (SimpleCameraData::Entity &entity : data->entities_)
++		for (SimpleCameraData::Entity &entity : data->entities_) {
+ 			entities.insert(entity.entity);
++			if (entity.sink)
++				usedPads.insert(entity.sink);
++		}
+ 
+ 		pipelines.push_back(std::move(data));
+ 	}
+-- 
+2.54.0
+

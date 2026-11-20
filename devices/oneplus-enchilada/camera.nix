@@ -20,6 +20,10 @@ let
       ./libcamera/0008-ipa-Log-autofocus-activity-at-info-level.patch
       # Upstream 7ebae537 (2026-10-29): clipped highlights skewed AWB (cast).
       ./libcamera/0009-libcamera-software_isp-Exclude-saturated-pixels-from.patch
+      # All three sensors were routed through csid0 -> vfe0_rdi0; configuring
+      # one camera rerouted the links under another (no image / EBUSY when
+      # switching cameras). Each sensor now gets its own CSID and VFE RDI.
+      ./libcamera/0010-pipeline-simple-Give-each-camera-its-own-path-throug.patch
     ];
   });
 in
