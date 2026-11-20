@@ -102,6 +102,14 @@ in
       })
     ];
 
+    # ModemManager 1.24.2 segfaults in netlink_messages_cb when a bearer
+    # is replaced and its qmapmux link re-created: transaction_complete()
+    # frees the transaction, then calls its completion_fn. Upstream fix
+    # 9317cbc4 (on main, not in a release yet).
+    networking.modemmanager.package = lib.mkDefault (pkgs.modemmanager.overrideAttrs (old: {
+      patches = (old.patches or [ ]) ++ [ ./modemmanager-netlink-fix-use-after-free.patch ];
+    }));
+
     systemd.services = {
       "81voltd" = mkIf config.networking.modemmanager.enable {
         wantedBy = [ "multi-user.target" ];
