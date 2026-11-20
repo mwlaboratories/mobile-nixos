@@ -1,0 +1,73 @@
+From: mwlaboratories <info@mwlabs.be>
+Subject: [PATCH] media: venus: venc: size input buffers to the firmware requirement
+
+venc_queue_setup() asks the firmware for its input buffer requirements
+(HFI_PROPERTY_CONFIG_BUFFER_REQUIREMENTS) but keeps only the count. The
+size handed to vb2, and to the firmware as alloc_len, comes from the
+driver's own NV12 formula. On HFI v4 (sdm845) there is no driver-side
+buffer calculation, so the firmware's number is the authority.
+
+Since "drop extra padding in NV12 raw size calculation" (7.4) that
+formula is 12 KiB smaller than before, and smaller than the downstream
+VENUS_BUFFER_SIZE layout the sdm845 firmware was written against. On the
+OnePlus 6 the encoder then produced no frame in 60 s.
+
+Take the larger of the two sizes, and log both under dynamic debug so
+the gap can be measured.
+
+Status: hypothesis until tested on the OnePlus 6 (sdm845, venus 5.2).
+---
+--- a/drivers/media/platform/qcom/venus/venc.c
++++ b/drivers/media/platform/qcom/venus/venc.c
+@@ -1064,7 +1064,8 @@
+ 	return ret;
+ }
+ 
+-static int venc_out_num_buffers(struct venus_inst *inst, unsigned int *num)
++static int venc_out_num_buffers(struct venus_inst *inst, unsigned int *num,
++				unsigned int *size)
+ {
+ 	struct hfi_buffer_requirements bufreq;
+ 	int ret;
+@@ -1074,6 +1075,7 @@
+ 		return ret;
+ 
+ 	*num = bufreq.count_actual;
++	*size = bufreq.size;
+ 
+ 	return 0;
+ }
+@@ -1084,7 +1086,7 @@
+ {
+ 	struct venus_inst *inst = vb2_get_drv_priv(q);
+ 	struct venus_core *core = inst->core;
+-	unsigned int num, min = 4;
++	unsigned int num, fw_size = 0, min = 4;
+ 	int ret;
+ 
+ 	if (*num_planes) {
+@@ -1136,7 +1138,7 @@
+ 	case V4L2_BUF_TYPE_VIDEO_OUTPUT_MPLANE:
+ 		*num_planes = inst->fmt_out->num_planes;
+ 
+-		ret = venc_out_num_buffers(inst, &num);
++		ret = venc_out_num_buffers(inst, &num, &fw_size);
+ 		if (ret)
+ 			break;
+ 
+@@ -1147,6 +1149,15 @@
+ 		sizes[0] = venus_helper_get_framesz(inst->fmt_out->pixfmt,
+ 						    inst->out_width,
+ 						    inst->out_height);
++		/*
++		 * The firmware reports the input buffer size it needs (HFI v4
++		 * has no driver-side calculation). Never hand it less.
++		 */
++		dev_dbg(core->dev,
++			"venc: input %ux%u, driver size %u, firmware size %u, count %u\n",
++			inst->out_width, inst->out_height, sizes[0], fw_size,
++			*num_buffers);
++		sizes[0] = max(sizes[0], fw_size);
+ 		inst->input_buf_size = sizes[0];
+ 		break;
+ 	case V4L2_BUF_TYPE_VIDEO_CAPTURE_MPLANE:
