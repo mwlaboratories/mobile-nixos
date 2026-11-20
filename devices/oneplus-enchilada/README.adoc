@@ -40,6 +40,32 @@ You will need to erase the `dtbo` partitions for either slots.
 This is not supported. Refer to other non-Android Linux instructions and
 adapt as needed. Here be snapdragons.
 
+=== Building and updating
+
+With `mobile.boot.stage-1.kernel.buildOn = "x86_64-linux";`, only the device
+kernel (`config.mobile.boot.stage-1.kernel.package`) is cross-compiled on a
+PC. The cross package set gets `config.nixpkgs.overlays` too; that does not
+affect the kernel. Everything else comes from cache.nixos.org as native
+aarch64.
+
+Packages that a configuration modifies are not in the cache. Build them on the
+phone itself rather than on a PC under qemu/binfmt emulation: a GNOME Shell
+rebuild took 89 s natively on the phone and 254 s under emulation on a
+16-thread PC.
+
+The recommended flow, as used by
+link:https://github.com/mwlaboratories/phoneputer[phoneputer]:
+
+. When the kernel changes, build it on the PC and copy it to the phone, then
+  flash the new boot image as well. phoneputer exposes the kernel as
+  `packages.x86_64-linux.kernel` for this:
++
+```
+ $ nix copy --to ssh://root@<phone> <config>#kernel
+```
+. Rebuild the system on the phone (`nh os switch` or `nixos-rebuild switch`).
+  It finds the kernel already in the store.
+
 === Hardware status
 
 Measured on 2026-11-20 with kernel 7.4.0-rc3.
