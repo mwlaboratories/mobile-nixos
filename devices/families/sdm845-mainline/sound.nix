@@ -11,8 +11,14 @@
             name = "sdm845-alsa-ucm";
             owner = "sdm845-mainline";
             repo = "alsa-ucm-conf";
-            rev = "621c71fd5f5742c60d38766ebb2d1bd3b863a2a4"; # master
-            sha256 = "sha256-CgAPg0UUAJUE1gD59l2GNDx3h9crAato6O/dDJpRwiY=";
+            # The commit postmarketOS ships (alsa-ucm-conf-sdm845, 2026-05-09).
+            # Over the 2022 pin: OnePlus 6/6T get a "Voice Call" verb
+            # (earpiece + bottom mic, q6voice routes to SLIMBUS_0), the
+            # earpiece in HiFi, and another mic route: bottom mic ADC4
+            # through AMIC4_5 SEL on MultiMedia2 (hw:0,1). The 2022 config
+            # captured ADC3 on MultiMedia3 and recorded silence on 7.4.
+            rev = "1b8d290e5aa2ca16b7f2fa8d74910ad19ef88b3a";
+            hash = "sha256-Kg4vxDrli/ffNeUwDBL5GfdJsbwFRPAUieQEsjVKADw=";
           };
         } ''
           mkdir -p $out/share/
