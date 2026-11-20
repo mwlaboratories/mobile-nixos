@@ -1,0 +1,57 @@
+From 295637844aba5cef80dd530f626f8e76dac3f20e Mon Sep 17 00:00:00 2001
+From: mwlaboratories <noreply@example.invalid>
+Date: Fri, 20 Nov 2026 17:53:56 +0100
+Subject: [PATCH 11/12] ipa: simple: Start the IMX376 in continuous autofocus
+
+The IMX376 second rear camera of the OnePlus 6 has a voice coil lens
+(lc89821x 17-0074) that the autofocus algorithm drives, but without a
+tuning file the camera falls back to uncalibrated.yaml and starts in
+manual focus, and applications on the phone don't set AfMode: the lens
+never moved. Add an imx376.yaml that starts in continuous autofocus, as
+for the IMX519.
+
+Measured with cam: a manual sweep moves the image from sharp to blurred
+and back; with this file the scan focuses (lens 1.9 of 15) within 1.5 s
+and the image turns sharp.
+---
+ src/ipa/simple/data/imx376.yaml | 15 +++++++++++++++
+ src/ipa/simple/data/meson.build |  1 +
+ 2 files changed, 16 insertions(+)
+ create mode 100644 src/ipa/simple/data/imx376.yaml
+
+diff --git a/src/ipa/simple/data/imx376.yaml b/src/ipa/simple/data/imx376.yaml
+new file mode 100644
+index 0000000..2ac6706
+--- /dev/null
++++ b/src/ipa/simple/data/imx376.yaml
+@@ -0,0 +1,15 @@
++# SPDX-License-Identifier: CC0-1.0
++%YAML 1.1
++---
++version: 1
++algorithms:
++  - BlackLevel:
++  - Awb:
++  - Adjust:
++  - Agc:
++  # The IMX376 second rear camera of the OnePlus 6 has a voice coil focus
++  # lens. Applications on the phone don't set AfMode, so start in continuous
++  # autofocus. No lens map yet: positions in dioptres are uncalibrated.
++  - Af:
++      mode: continuous
++...
+diff --git a/src/ipa/simple/data/meson.build b/src/ipa/simple/data/meson.build
+index c89c492..029bdde 100644
+--- a/src/ipa/simple/data/meson.build
++++ b/src/ipa/simple/data/meson.build
+@@ -1,6 +1,7 @@
+ # SPDX-License-Identifier: CC0-1.0
+ 
+ conf_files = files([
++    'imx376.yaml',
+     'imx519.yaml',
+     'uncalibrated.yaml',
+ ])
+-- 
+2.54.0
+

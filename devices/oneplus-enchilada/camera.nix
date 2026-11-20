@@ -24,6 +24,10 @@ let
       # one camera rerouted the links under another (no image / EBUSY when
       # switching cameras). Each sensor now gets its own CSID and VFE RDI.
       ./libcamera/0010-pipeline-simple-Give-each-camera-its-own-path-throug.patch
+      # Second rear camera: its lens never moved (no tuning file, manual AF).
+      ./libcamera/0011-ipa-simple-Start-the-IMX376-in-continuous-autofocus.patch
+      # Main camera: CCMs (Raspberry Pi IMX519 tuning), colours less washed out.
+      ./libcamera/0012-ipa-simple-Add-colour-correction-matrices-for-the-IM.patch
     ];
   });
 in
