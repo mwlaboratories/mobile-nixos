@@ -1,0 +1,114 @@
+From c1f0bc2324c10ba34c8125b3187f2a5ed739acd5 Mon Sep 17 00:00:00 2001
+From: mwlaboratories <info@mwlabs.be>
+Date: Fri, 20 Nov 2026 11:35:31 +0100
+Subject: [PATCH 5/5] ipa: simple: Start the IMX519 in continuous autofocus
+
+Add a 'mode' tuning key to AfContrast that selects the initial AfMode (and the AfMode default), and an imx519.yaml tuning file that starts in continuous autofocus: GNOME Snapshot and PipeWire never set AfMode.
+---
+ src/ipa/libipa/af_contrast.cpp  | 19 ++++++++++++++++++-
+ src/ipa/libipa/af_contrast.h    |  1 +
+ src/ipa/simple/data/imx519.yaml | 16 ++++++++++++++++
+ src/ipa/simple/data/meson.build |  1 +
+ 4 files changed, 36 insertions(+), 1 deletion(-)
+ create mode 100644 src/ipa/simple/data/imx519.yaml
+
+diff --git a/src/ipa/libipa/af_contrast.cpp b/src/ipa/libipa/af_contrast.cpp
+index 7aafc0e..0544baf 100644
+--- a/src/ipa/libipa/af_contrast.cpp
++++ b/src/ipa/libipa/af_contrast.cpp
+@@ -11,6 +11,7 @@
+ #include <algorithm>
+ #include <cmath>
+ #include <limits>
++#include <string>
+ 
+ #include <linux/v4l2-controls.h>
+ 
+@@ -98,6 +99,8 @@ namespace af {
+  *   captured before the movement)
+  * - skip_frames: The number of frames to skip at start
+  * - map: A piecewise linear function from dioptres to lens driver units
++ * - mode: The AfMode to start in, "manual" (default), "auto" or "continuous",
++ *   for platforms whose applications don't set AfMode themselves
+  */
+ 
+ /**
+@@ -165,6 +168,17 @@ void AfContrast::parseTuning(const ValueNode &tuningData)
+ 
+ 	skipFrames_ = tuningData["skip_frames"].get<uint32_t>(5);
+ 
++	const std::string mode = tuningData["mode"].get<std::string>("manual");
++	if (mode == "continuous")
++		initialMode_ = controls::AfModeContinuous;
++	else if (mode == "auto")
++		initialMode_ = controls::AfModeAuto;
++	else if (mode == "manual")
++		initialMode_ = controls::AfModeManual;
++	else
++		LOG(AfContrast, Warning)
++			<< "Unknown AF mode '" << mode << "', using manual";
++
+ 	map_ = tuningData["map"].get<Pwl>(Pwl{});
+ 	if (map_.size() < 2) {
+ 		LOG(AfContrast, Warning)
+@@ -212,10 +226,13 @@ int AfContrast::init(const ValueNode &tuningData,
+ 	lensMax_ = focus->second.max().get<int32_t>();
+ 
+ 	parseTuning(tuningData);
++	setMode(initialMode_);
+ 
+ 	Pwl::Interval limits = map_.domain();
+ 
+-	controls[&controls::AfMode] = ControlInfo(controls::AfModeValues);
++	controls[&controls::AfMode] =
++		ControlInfo(controls::AfModeValues,
++			    ControlValue(static_cast<int32_t>(initialMode_)));
+ 	controls[&controls::AfRange] = ControlInfo(controls::AfRangeValues);
+ 	controls[&controls::AfSpeed] = ControlInfo(controls::AfSpeedValues);
+ 	controls[&controls::AfMetering] = ControlInfo(controls::AfMeteringValues);
+diff --git a/src/ipa/libipa/af_contrast.h b/src/ipa/libipa/af_contrast.h
+index fef4b23..e669ccf 100644
+--- a/src/ipa/libipa/af_contrast.h
++++ b/src/ipa/libipa/af_contrast.h
+@@ -131,6 +131,7 @@ private:
+ 	bool useWindows_ = false;
+ 
+ 	controls::AfModeEnum mode_ = controls::AfModeManual;
++	controls::AfModeEnum initialMode_ = controls::AfModeManual;
+ 	controls::AfRangeEnum range_ = controls::AfRangeNormal;
+ 	controls::AfSpeedEnum speed_ = controls::AfSpeedNormal;
+ 	bool pauseFlag_ = false;
+diff --git a/src/ipa/simple/data/imx519.yaml b/src/ipa/simple/data/imx519.yaml
+new file mode 100644
+index 0000000..e06be8e
+--- /dev/null
++++ b/src/ipa/simple/data/imx519.yaml
+@@ -0,0 +1,16 @@
++# SPDX-License-Identifier: CC0-1.0
++%YAML 1.1
++---
++version: 1
++algorithms:
++  - BlackLevel:
++  - Awb:
++  - Adjust:
++  - Agc:
++  # The IMX519 modules seen with the simple pipeline handler (OnePlus 6/6T)
++  # have a voice coil focus lens. Applications on these phones don't set
++  # AfMode, so start in continuous autofocus. No lens map yet: positions in
++  # dioptres are uncalibrated (linear over the lens driver range).
++  - Af:
++      mode: continuous
++...
+diff --git a/src/ipa/simple/data/meson.build b/src/ipa/simple/data/meson.build
+index 92795ee..c89c492 100644
+--- a/src/ipa/simple/data/meson.build
++++ b/src/ipa/simple/data/meson.build
+@@ -1,6 +1,7 @@
+ # SPDX-License-Identifier: CC0-1.0
+ 
+ conf_files = files([
++    'imx519.yaml',
+     'uncalibrated.yaml',
+ ])
+ 

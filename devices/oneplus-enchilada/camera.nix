@@ -1,5 +1,21 @@
-{ ... }:
+{ lib, pkgs, ... }:
 
+let
+  # Contrast-detection autofocus for the software ISP: Jayden Milne's
+  # softisp-af branch (github.com/jaydens-tasty-slop/libcamera, 2026-11-01),
+  # backported to libcamera 0.7.2 (src/ipa/softisp -> src/ipa/simple), plus
+  # a tuning file that starts the IMX519 in continuous AF. Upstream has no
+  # soft-ISP AF yet (only RFCs). The patches are made against 0.7.2 exactly.
+  libcameraAf = pkgs.libcamera.overrideAttrs (old: {
+    patches = (old.patches or [ ]) ++ [
+      ./libcamera/0001-libcamera-software_isp-Gather-focus-statistics.patch
+      ./libcamera/0002-libcamera-software_isp-Pass-focus-lens-controls-to-a.patch
+      ./libcamera/0003-ipa-libipa-Add-contrast-detection-autofocus-algorith.patch
+      ./libcamera/0004-ipa-simple-Add-autofocus-algorithm.patch
+      ./libcamera/0005-ipa-simple-Start-the-IMX519-in-continuous-autofocus.patch
+    ];
+  });
+in
 {
   # libcamera's software ISP (the only ISP for these raw SRGGB10 sensors)
   # allocates its output buffers from a dma-buf heap. libcamera 0.7.2 tries
@@ -13,6 +29,24 @@
   services.udev.extraRules = ''
     SUBSYSTEM=="dma_heap", KERNEL=="reserved|system|linux,cma", GROUP="video", MODE="0660", TAG+="uaccess"
   '';
+
+  # Autofocus (see libcameraAf above). The patches only change libcamera's
+  # internals (soft ISP, its IPA and libipa), not its public ABI, so the
+  # patched build replaces libcamera in the system closure without
+  # rebuilding PipeWire and everything above it.
+  # The lens drivers (lc89821x, lens-focus in the DT) are already in place.
+  assertions = [
+    {
+      assertion = pkgs.libcamera.version == "0.7.2";
+      message = "devices/oneplus-enchilada/libcamera: the AF patches are made for libcamera 0.7.2, nixpkgs has ${pkgs.libcamera.version}; rebase them.";
+    }
+  ];
+  system.replaceDependencies.replacements = [
+    {
+      oldDependency = pkgs.libcamera;
+      newDependency = libcameraAf;
+    }
+  ];
 
   # Both rear sensors report location "back", so WirePlumber names both
   # nodes "Built-in Back Camera". GNOME Snapshot stores the chosen camera by
