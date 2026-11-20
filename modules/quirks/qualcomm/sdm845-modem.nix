@@ -122,7 +122,11 @@ in
         };
       };
       "81voltd" =mkIf config.networking.modemmanager.enable {
-        wantedBy = [ "multi-user.target" ];
+        # Restart together with ModemManager (PartOf) and start whenever it
+        # starts (WantedBy), so it always looks for the modem on a fresh
+        # ModemManager instead of relying on the re-add signal alone.
+        wantedBy = [ "multi-user.target" "ModemManager.service" ];
+        partOf = [ "ModemManager.service" ];
         # The packaged unit orders after "ModemManager.target", which
         # doesn't exist.
         after = [ "ModemManager.service" "qrtr-ns.service" ];
