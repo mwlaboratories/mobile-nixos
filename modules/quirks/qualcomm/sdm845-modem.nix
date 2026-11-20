@@ -111,7 +111,17 @@ in
     }));
 
     systemd.services = {
-      "81voltd" = mkIf config.networking.modemmanager.enable {
+      # Shutdown waited the full 90 s on ModemManager. Its own shutdown
+      # gives up after 20 s (MAX_SHUTDOWN_TIME_SECS); cap the stop just
+      # above that. KillMode=mixed as upstream (225e66fe): SIGTERM only the
+      # daemon, so a QMI proxy in the cgroup outlives the modem disable.
+      ModemManager = mkIf config.networking.modemmanager.enable {
+        serviceConfig = {
+          KillMode = "mixed";
+          TimeoutStopSec = 25;
+        };
+      };
+      "81voltd" =mkIf config.networking.modemmanager.enable {
         wantedBy = [ "multi-user.target" ];
         # The packaged unit orders after "ModemManager.target", which
         # doesn't exist.
