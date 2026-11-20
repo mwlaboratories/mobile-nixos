@@ -1,0 +1,74 @@
+From: mwlaboratories <info@mwlabs.be>
+Subject: [PATCH] ASoC: qdsp6: q6voice: choose the CVP session version at runtime
+
+The CVP session is created with VSS_IVOCPROC_CMD_CREATE_FULL_CONTROL_
+SESSION_V2 unless the DT says "qcom,cvd-v2.3", which no sdm845 DT does.
+The v3 path also sends the RX/TX channel info, the endpoint media format
+(48 kHz; RX 2 channels, TX 1) and commits the topology, as downstream
+does on CVD 2.3. On the OnePlus 6 a CS call has uplink audio but a
+silent downlink with v2; whether v3 fixes it has to be tried on the
+phone, and v3 may as well break the uplink.
+
+Add a cvd_mode module parameter (-1 = DT, default; 0 = v2; 1 = v3),
+read at every call start, so both can be compared on one boot. Log
+which version a call uses. If the v3 create fails, fall back to v2.
+
+session_create_v3() only caught a NULL session, but
+q6voice_session_create() returns ERR_PTR() on failure; treat both as a
+failure instead of sending commands on an error pointer.
+---
+--- a/sound/soc/qcom/qdsp6/q6voice.c
++++ b/sound/soc/qcom/qdsp6/q6voice.c
+@@ -13,6 +13,16 @@
+ #include "q6mvm.h"
+ #include "q6voice-common.h"
+ 
++/*
++ * Which CVP session the DSP gets: -1 = the DT ("qcom,cvd-v2.3"), 0 = v2,
++ * 1 = v3 (v2 plus RX/TX channel info, endpoint media format and a topology
++ * commit). Read at every call start, so it can be compared without a
++ * reboot: echo 1 > /sys/module/q6voice/parameters/cvd_mode
++ */
++static int cvd_mode = -1;
++module_param(cvd_mode, int, 0644);
++MODULE_PARM_DESC(cvd_mode, "CVP session: -1 = from DT, 0 = v2, 1 = v3");
++
+ #define VSS_IVOCPROC_TOPOLOGY_ID_TX_SM_ECNS		0x00010F71
+ #define VSS_IVOCPROC_TOPOLOGY_ID_RX_DEFAULT		0x00010F77
+ 
+@@ -52,8 +62,8 @@
+ 	struct q6voice_session *cvp;
+ 
+ 	cvp = q6cvp_session_create_v3(type, tx_port, rx_port, tx_topo, rx_topo);
+-	if (cvp == NULL)
+-		return NULL;
++	if (IS_ERR_OR_NULL(cvp))
++		return cvp ? cvp : ERR_PTR(-EIO);
+ 
+ 	q6cvp_send_channel_info(cvp, false);
+ 	q6cvp_send_channel_info(cvp, true);
+@@ -84,12 +94,18 @@
+ 
+ 	cvp = p->runtime->sessions[Q6VOICE_SERVICE_CVP];
+ 	if (!cvp) {
+-		if (p->v->cvd_v2_3)
+-			cvp = session_create_v3(p->type,
+-						q6afe_get_port_id(p->tx_port),
+-						q6afe_get_port_id(p->rx_port),
+-						p->tx_topo, p->rx_topo);
+-		else
++		bool v3 = cvd_mode < 0 ? p->v->cvd_v2_3 : cvd_mode > 0;
++
++		cvp = v3 ? session_create_v3(p->type,
++					     q6afe_get_port_id(p->tx_port),
++					     q6afe_get_port_id(p->rx_port),
++					     p->tx_topo, p->rx_topo) : NULL;
++		if (v3 && IS_ERR(cvp))
++			dev_warn(dev, "v3 CVP session failed (%ld), using v2\n",
++				 PTR_ERR(cvp));
++		dev_info(dev, "path %d: %s CVP session\n", p->type,
++			 v3 && !IS_ERR(cvp) ? "v3" : "v2");
++		if (!v3 || IS_ERR(cvp))
+ 			cvp = session_create(p->type,
+ 					     q6afe_get_port_id(p->tx_port),
+ 					     q6afe_get_port_id(p->rx_port),

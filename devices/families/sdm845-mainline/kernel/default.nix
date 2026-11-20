@@ -252,6 +252,8 @@ mobile-nixos.kernel-builder {
     ./0013-media-i2c-imx519-default-the-C-PHY-1080p-and-720p-modes-to-30-fps.patch
     # Front camera: dot lattice from uncorrected phase-detection pixels.
     ./0014-media-i2c-imx371-enable-mapped-couplet-correction.patch
+    # Calls: silent downlink; v2/v3 CVP session selectable at runtime.
+    ./0015-ASoC-qdsp6-q6voice-choose-the-CVP-session-version-at-runtime.patch
   ];
 
   nativeBuildInputs = [ buildPackages.python3 buildPackages.zstd buildPackages.kmod ];
