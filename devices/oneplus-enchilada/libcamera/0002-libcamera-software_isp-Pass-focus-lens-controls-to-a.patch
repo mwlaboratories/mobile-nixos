@@ -1,7 +1,7 @@
 From f796a49232ef2223641044a471fadd2b1f5de61d Mon Sep 17 00:00:00 2001
 From: Jayden Milne <linux@jayd.ml>
 Date: Fri, 20 Nov 2026 11:33:23 +0100
-Subject: [PATCH 2/5] libcamera: software_isp: Pass focus lens controls to and
+Subject: [PATCH 2/8] libcamera: software_isp: Pass focus lens controls to and
  from the IPA
 
 Backported to v0.7.2 from jaydens-tasty-slop/libcamera 2c0be3c.

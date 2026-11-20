@@ -1,0 +1,66 @@
+From ab58eaa2e789abbae2c8d69d59dbedea5f1e9107 Mon Sep 17 00:00:00 2001
+From: mwlaboratories <info@mwlabs.be>
+Date: Fri, 20 Nov 2026 12:17:15 +0100
+Subject: [PATCH 6/8] pipeline: simple: Pass the start controls to the software
+ ISP IPA
+
+SimplePipelineHandler::start() ignored its controls, so controls an application sets at start (PipeWire sets AfMode to continuous there) never reached the soft IPA. Keep them and merge them into the first request queued to the software ISP, the request's own controls taking precedence.
+---
+ src/libcamera/pipeline/simple/simple.cpp | 23 +++++++++++++++++++++--
+ 1 file changed, 21 insertions(+), 2 deletions(-)
+
+diff --git a/src/libcamera/pipeline/simple/simple.cpp b/src/libcamera/pipeline/simple/simple.cpp
+index 41d7e74..2496065 100644
+--- a/src/libcamera/pipeline/simple/simple.cpp
++++ b/src/libcamera/pipeline/simple/simple.cpp
+@@ -360,6 +360,8 @@ public:
+ 
+ 	std::unique_ptr<Converter> converter_;
+ 	std::unique_ptr<SoftwareIsp> swIsp_;
++	/* Controls passed to start(), applied with the first request. */
++	std::optional<ControlList> startControls_;
+ 	SimpleFrames frameInfo_;
+ 
+ private:
+@@ -1643,13 +1645,22 @@ int SimplePipelineHandler::exportFrameBuffers(Camera *camera, Stream *stream,
+ 		return data->video_->exportBuffers(count, buffers);
+ }
+ 
+-int SimplePipelineHandler::start(Camera *camera, [[maybe_unused]] const ControlList *controls)
++int SimplePipelineHandler::start(Camera *camera, const ControlList *controls)
+ {
+ 	SimpleCameraData *data = cameraData(camera);
+ 	V4L2VideoDevice *video = data->video_;
+ 	V4L2Subdevice *frameStartEmitter = data->frameStartEmitter_;
+ 	int ret;
+ 
++	/*
++	 * The software ISP IPA only receives controls through requests. Keep
++	 * the start controls (e.g. the AfMode PipeWire sets) for the first one.
++	 */
++	if (controls && !controls->empty())
++		data->startControls_ = *controls;
++	else
++		data->startControls_.reset();
++
+ 	const MediaPad *pad = acquirePipeline(data);
+ 	if (pad) {
+ 		LOG(SimplePipeline, Info)
+@@ -1777,8 +1788,16 @@ int SimplePipelineHandler::queueRequestDevice(Camera *camera, Request *request)
+ 	data->frameInfo_.create(request, metadataRequired);
+ 	if (data->useConversion_) {
+ 		data->conversionQueue_.push({ request, std::move(buffers) });
+-		if (data->swIsp_)
++		if (data->swIsp_ && data->startControls_) {
++			/* The request's own controls take precedence. */
++			ControlList controls(std::move(*data->startControls_));
++			data->startControls_.reset();
++			controls.merge(request->controls(),
++				       ControlList::MergePolicy::OverwriteExisting);
++			data->swIsp_->queueRequest(request->sequence(), controls);
++		} else if (data->swIsp_) {
+ 			data->swIsp_->queueRequest(request->sequence(), request->controls());
++		}
+ 	}
+ 
+ 	return 0;

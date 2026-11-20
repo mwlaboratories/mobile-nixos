@@ -13,6 +13,11 @@ let
       ./libcamera/0003-ipa-libipa-Add-contrast-detection-autofocus-algorith.patch
       ./libcamera/0004-ipa-simple-Add-autofocus-algorithm.patch
       ./libcamera/0005-ipa-simple-Start-the-IMX519-in-continuous-autofocus.patch
+      # PipeWire sets AfMode at camera start; the simple pipeline dropped it.
+      ./libcamera/0006-pipeline-simple-Pass-the-start-controls-to-the-softw.patch
+      # Gain models and black levels: without them AGC never raised the gain.
+      ./libcamera/0007-ipa-libipa-camera_sensor_helper-Add-IMX371-IMX376-an.patch
+      ./libcamera/0008-ipa-Log-autofocus-activity-at-info-level.patch
     ];
   });
 in
