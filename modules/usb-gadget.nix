@@ -158,6 +158,17 @@ in
         ipv6.method = "ignore";
       };
 
+      # The USB link is for reaching the device (ssh), not for routing the
+      # host through it: "shared" would otherwise hand the host a default
+      # route and DNS via the device, which can win over the host's own
+      # network and dies with the device's uplink. An option without data
+      # tells dnsmasq not to send it; requests are tagged with the interface
+      # they came in on, so other shared connections (a hotspot) keep theirs.
+      environment.etc."NetworkManager/dnsmasq-shared.d/usb-gadget.conf".text = ''
+        dhcp-option=tag:usb0,option:router
+        dhcp-option=tag:usb0,option:dns-server
+      '';
+
       # NetworkManager's 85-nm-unmanaged.rules unmanages every DEVTYPE=gadget
       # interface, so the profile above would never activate. Re-manage usb0;
       # NetworkManager reads this when usb0 is added.
