@@ -1,0 +1,40 @@
+From: mwlaboratories <info@mwlabs.be>
+Subject: [PATCH] media: i2c: imx519: enforce a minimum vertical blanking
+
+imx519_get_frame_length() derives the frame length from the pixel clock
+and the requested frame interval, floored at the mode height only. On
+C-PHY the 3840x2160, 1920x1080 and 1280x720 modes then get 0, 0 and 1
+line of vertical blanking (the vendor tables use 100), and the sensor
+cuts the frame short: at 1280x720 the OnePlus 6 delivered 673 of 720
+lines, leaving 47 black lines at the bottom of every frame.
+
+Floor the frame length at the mode height plus 100 lines.
+
+Status: hypothesis until tested on the OnePlus 6.
+---
+--- a/drivers/media/i2c/imx519.c
++++ b/drivers/media/i2c/imx519.c
+@@ -55,6 +55,13 @@
+ 
+ #define IMX519_FRAME_LENGTH_MAX		0xffdc
+ 
++/*
++ * Minimum vertical blanking. With less, the sensor cuts the frame short: on
++ * C-PHY the 720p mode at 721 lines (1 line of blanking) delivered only 673
++ * of its 720 lines. The vendor mode tables use 100 lines of blanking.
++ */
++#define IMX519_VBLANK_MIN		100
++
+ /* Long exposure multiplier */
+ #define IMX519_LONG_EXP_SHIFT_MAX	7
+ #define IMX519_LONG_EXP_SHIFT_REG	CCI_REG8(0x3100)
+@@ -1208,7 +1215,8 @@
+ 	if (WARN_ON(frame_length > IMX519_FRAME_LENGTH_MAX))
+ 		frame_length = IMX519_FRAME_LENGTH_MAX;
+ 
+-	return max_t(unsigned int, frame_length, mode->height);
++	return max_t(unsigned int, frame_length,
++		     mode->height + IMX519_VBLANK_MIN);
+ }
+ 
+ static void imx519_set_framing_limits(struct imx519 *imx519)

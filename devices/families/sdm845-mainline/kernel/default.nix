@@ -246,6 +246,8 @@ mobile-nixos.kernel-builder {
     ./0010-ASoC-codecs-wcd934x-enable-MCLK-for-the-capture-path.patch
     # Front and second rear camera: analogue gain capped at ~1.9x (code 480).
     ./0011-media-i2c-imx371-imx376-allow-analogue-gain-up-to-16x.patch
+    # Main camera: 47 black lines at 720p (no vertical blanking on C-PHY).
+    ./0012-media-i2c-imx519-enforce-a-minimum-vertical-blanking.patch
   ];
 
   nativeBuildInputs = [ buildPackages.python3 buildPackages.zstd buildPackages.kmod ];
