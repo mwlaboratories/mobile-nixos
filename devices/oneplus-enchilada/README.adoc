@@ -40,6 +40,28 @@ You will need to erase the `dtbo` partitions for either slots.
 This is not supported. Refer to other non-Android Linux instructions and
 adapt as needed. Here be snapdragons.
 
+=== Hardware status
+
+Measured on 2026-11-20 with kernel 7.4.0-rc3.
+
+All three cameras work in GNOME Snapshot through libcamera's software ISP.
+Each sensor has its own CSID/VFE path in libcamera, so switching between
+cameras is reliable. The main rear camera (imx519) lets its supplies settle
+and resets after power-up; it started without a stall in 30 of 30 starts
+(previously 8 to 15 stalled). The second rear camera (imx376) autofocuses. The
+front camera (imx371) uses a 2x2 binned full field-of-view mode (2304×1728)
+without the dot grid. Colour and lens shading are still rough.
+
+Mobile data works over 4G at about 20 Mbit/s, and SMS works in both directions.
+Calls ring and connect in both directions over 2G (CSFB), but there is no
+downlink call audio yet. VoLTE and 5G do not work.
+
+The microphone and speaker work, as do the sensors and screen rotation, USB-C
+OTG, and the stage-2 USB gadget.
+
+The fingerprint sensor is not supported: it sits behind QSEE, and its trusted
+applications (fpc1228, gfp5288) are on the vendor partition.
+
 === Known issues
 
 ==== Wi-Fi after restarting rmtfs
