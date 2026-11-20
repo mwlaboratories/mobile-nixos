@@ -29,7 +29,7 @@
  }
 --- a/ucm2/OnePlus/enchilada/VoiceCall.conf
 +++ b/ucm2/OnePlus/enchilada/VoiceCall.conf
-@@ -115,7 +115,5 @@
+@@ -107,7 +107,5 @@
  	Value {
  		CapturePriority 200
  		CapturePCM "hw:${CardId},1" # MultiMedia2
@@ -37,3 +37,4 @@
 -		CaptureVolume "ADC4 Volume"
  	}
  }
+Only in s2/ucm2/OnePlus/enchilada: VoiceCall.conf.orig

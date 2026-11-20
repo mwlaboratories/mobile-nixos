@@ -1,13 +1,8 @@
 --- a/ucm2/OnePlus/enchilada/VoiceCall.conf
 +++ b/ucm2/OnePlus/enchilada/VoiceCall.conf
-@@ -48,12 +48,19 @@
- SectionDevice."Earpiece" {
+@@ -49,11 +49,14 @@
  	Comment "Earpiece"
  
-+	ConflictingDevice [
-+		"Speaker"
-+	]
-+
  	EnableSequence [
 +		# Call audio to the earpiece (back from the speaker)
 +		cset "name='SLIMBUS_0_RX Voice Mixer VoiceMMode1' 1"
@@ -20,7 +15,7 @@
  	]
  
  	Value {
-@@ -63,6 +70,35 @@
+@@ -63,6 +66,31 @@
  	}
  }
  
@@ -30,10 +25,6 @@
 +# "ASoC: qdsp6: q6voice: move a running call to a new port".
 +SectionDevice."Speaker" {
 +	Comment "Speaker"
-+
-+	ConflictingDevice [
-+		"Earpiece"
-+	]
 +
 +	EnableSequence [
 +		cset "name='QUAT_MI2S_RX Voice Mixer VoiceMMode1' 1"
