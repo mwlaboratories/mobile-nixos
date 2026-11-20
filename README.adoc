@@ -10,15 +10,19 @@ The official project lives at link:https://github.com/mobile-nixos/mobile-nixos[
 with its website at link:https://mobile-nixos.github.io/[mobile-nixos.github.io].
 
 The fork exists to run a current, fully usable NixOS on the OnePlus 6 (`oneplus-enchilada`, sdm845).
-On top of upstream it carries a mainline sdm845 kernel (currently 7.4-rc3 from the sdm845-linus tree, with OTG VBUS patches)
+On top of upstream it carries a mainline sdm845 kernel (currently 7.4.0-rc3 from the sdm845-linus tree)
+with patches for USB OTG VBUS, the cameras, call and microphone audio, and Venus hardware encoding,
 and fixes that let its config and module steps cross-compile cleanly.
 Shared modules gain configurable LOCALVERSION and UEVENT_HELPER kernel options, adjusted kernel config validation,
 and an option to generate Android sparse images.
-`mobile.boot.stage-1.kernel.buildOn = "x86_64-linux";` cross-compiles the device kernel on a PC while everything else comes from the binary cache.
+`mobile.boot.stage-1.kernel.buildOn = "x86_64-linux";` cross-compiles only the device kernel on a PC.
+Everything else comes from the binary cache as native aarch64; packages a configuration changes are best built on the phone itself
+(the link:devices/oneplus-enchilada/README.adoc[OnePlus 6 notes] describe the workflow).
 For the OnePlus 6 it adds firmware paths under the board name, a stable Bluetooth public address,
 sensors via hexagonrpcd and iio-sensor-proxy (SSC), an optional stage-2 USB gadget (NCM network and ACM serial),
-a stable default WiFi MAC address, ModemManager at boot,
-and camera access for libcamera's software ISP.
+a stable default WiFi MAC address, the modem stack (ModemManager at boot, SIM provisioning, call audio),
+and libcamera's software ISP with autofocus and a separate CSID/VFE path for each camera.
+The configuration that runs on the phone is link:https://github.com/mwlaboratories/phoneputer[mwlaboratories/phoneputer].
 
 The `main` branch tracks upstream `development` with these changes on top, and upstream is merged in periodically.
 These changes are not reviewed upstream and may be rough or temporary; some commits are explicitly marked `HACK`.
