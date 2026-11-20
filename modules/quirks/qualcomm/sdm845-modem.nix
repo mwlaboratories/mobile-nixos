@@ -155,9 +155,9 @@ in
       # 45 s for the modem to answer on QRTR and 4 s for the card to show
       # up; the inline script this replaces asked once, right after boot,
       # and took a modem still starting for "no SIM". No SIM, or no USIM
-      # application, exits 0. Oneshot rather than the upstream Type=notify
-      # unit: the result is the same, and an exit without READY can't fail
-      # it.
+      # application, exits 0. Type=notify as upstream: the script ends
+      # with `systemd-notify --ready` in an EXIT trap under `set -e`; with
+      # no NOTIFY_SOCKET (oneshot) that fails and turns exit 0 into 1.
       msm-modem-uim-selection = {
         enable = true;
         after = [ "rmtfs.service" ];
@@ -165,7 +165,9 @@ in
         before = [ "ModemManager.service" ];
         wantedBy = [ "ModemManager.service" "multi-user.target" ];
         serviceConfig = {
-          Type = "oneshot";
+          Type = "notify";
+          # systemd-notify runs as a child of the script.
+          NotifyAccess = "all";
           RemainAfterExit = true;
           ExecStart = "${pkgs.msm-modem}/libexec/msm-modem-uim-selection";
         };
