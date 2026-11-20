@@ -1,0 +1,50 @@
+--- a/ucm2/OnePlus/enchilada/HiFi.conf
++++ b/ucm2/OnePlus/enchilada/HiFi.conf
+@@ -22,6 +22,11 @@
+ 		# Q6Voice Routes for Call Audio Setup
+ 		cset "name='SLIMBUS_0_RX Voice Mixer VoiceMMode1' 1"
+ 		cset "name='VoiceMMode1 Capture Mixer SLIMBUS_0_TX' 1"
++		# Earpiece channel in AIF1_PB here too: q6voiced starts the voice
++		# streams at dialing, before callaudiod switches to "Voice Call",
++		# and the codec fixes the stream's SLIMbus channels then. Silent
++		# in HiFi: RX INT0 stays unrouted until the Earpiece device.
++		cset "name='SLIM RX0 MUX' AIF1_PB"
+ 
+ 		# Headphones
+ 		cset "name='SLIM RX2 MUX' AIF2_PB"
+@@ -66,6 +71,8 @@
+ 	EnableSequence [
+ 		cset "name='ADC MUX7' AMIC"
+ 		cset "name='AMIC MUX7' ADC4"
++		# 0 is mute; +4 dB as in the BootSequence, which does not run here
++		cset "name='ADC4 Volume' 16"
+ 	]
+ 
+ 	DisableSequence [
+@@ -102,6 +109,7 @@
+ 	EnableSequence [
+ 		cset "name='ADC MUX6' AMIC"
+ 		cset "name='AMIC MUX6' ADC3"
++		cset "name='ADC3 Volume' 16"
+ 	]
+ 
+ 	DisableSequence [
+@@ -146,6 +154,7 @@
+ 	EnableSequence [
+ 		cset "name='AMIC MUX0' ADC2"
+ 		cset "name='ADC MUX0' AMIC"
++		cset "name='ADC2 Volume' 16"
+ 	]
+ 
+ 	DisableSequence [
+--- a/ucm2/OnePlus/enchilada/VoiceCall.conf
++++ b/ucm2/OnePlus/enchilada/VoiceCall.conf
+@@ -97,6 +97,8 @@
+ 	EnableSequence [
+ 		cset "name='ADC MUX7' AMIC"
+ 		cset "name='AMIC MUX7' ADC4"
++		# 0 is mute; +4 dB as in the BootSequence, which does not run here
++		cset "name='ADC4 Volume' 16"
+ 	]
+ 
+ 	DisableSequence [

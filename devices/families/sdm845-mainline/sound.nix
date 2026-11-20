@@ -34,6 +34,9 @@ in
             # ADCn Volume spans 0..+5 dB with the minimum as mute; PipeWire
             # maps any source volume up to 100 % onto it and mutes the mic.
             ./ucm-enchilada-software-capture-volume.patch
+            # Calls: earpiece channel present when the voice streams start
+            # under HiFi, and ADC gains set by the capture devices.
+            ./ucm-enchilada-call-fixes.patch
           ];
         } ''
           mkdir -p $out/share/
