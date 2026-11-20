@@ -106,8 +106,25 @@ in
     # is replaced and its qmapmux link re-created: transaction_complete()
     # frees the transaction, then calls its completion_fn. Upstream fix
     # 9317cbc4 (on main, not in a release yet).
+    #
+    # And it aborted at shutdown with an active multiplexed (qmapmux) bearer:
+    # "mm_iface_modem_count_bearers: assertion failed: (max >= ctx.count)".
+    # Upstream fix 0edcb916 (main, not in 1.24.x).
+    #
+    # The upstream unit has Requires=polkit.service, so every polkit restart
+    # (e.g. by nixos-rebuild switch) stopped ModemManager too and dropped the
+    # mobile data connection. ModemManager asks polkit over D-Bus only to
+    # authorize a request, and D-Bus starts polkit on demand: Wants= is
+    # enough.
     networking.modemmanager.package = lib.mkDefault (pkgs.modemmanager.overrideAttrs (old: {
-      patches = (old.patches or [ ]) ++ [ ./modemmanager-netlink-fix-use-after-free.patch ];
+      patches = (old.patches or [ ]) ++ [
+        ./modemmanager-netlink-fix-use-after-free.patch
+        ./modemmanager-fix-cleanup-of-multiplexed-bearers.patch
+      ];
+      postPatch = (old.postPatch or "") + ''
+        substituteInPlace data/ModemManager.service.in \
+          --replace-fail 'Requires=@MM_POLKIT_SERVICE@' 'Wants=@MM_POLKIT_SERVICE@'
+      '';
     }));
 
     systemd.services = {
