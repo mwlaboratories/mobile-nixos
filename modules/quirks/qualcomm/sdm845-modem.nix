@@ -92,7 +92,15 @@ in
     # postmarketOS, soc-qcom-modem). Without it calls can only use 2G/3G
     # fallback. Whether the modem then registers IMS depends on the
     # operator profile in the modem firmware.
-    systemd.packages = mkIf config.networking.modemmanager.enable [ pkgs._81voltd ];
+    #
+    # Built against nixpkgs' qrtr: the Mobile NixOS overlay replaces qrtr
+    # with a 2020 Makefile build without qrtr.pc, which 81voltd's meson
+    # build needs. The rest of the modem stack stays on the overlay's.
+    systemd.packages = mkIf config.networking.modemmanager.enable [
+      (pkgs._81voltd.override {
+        qrtr = pkgs.callPackage "${pkgs.path}/pkgs/by-name/qr/qrtr/package.nix" { };
+      })
+    ];
 
     systemd.services = {
       "81voltd" = mkIf config.networking.modemmanager.enable {
