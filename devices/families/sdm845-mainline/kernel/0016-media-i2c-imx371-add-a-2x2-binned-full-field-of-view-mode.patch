@@ -1,0 +1,262 @@
+From: mwlaboratories <info@mwlabs.be>
+Subject: [PATCH] media: i2c: imx371: add a 2x2 binned full field of view mode
+
+The IMX371 front camera of the OnePlus 6 only had its 4656x3456 full
+resolution mode. The IMX371 is a quad Bayer sensor: at full resolution
+it delivers 2x2 same-colour cells that need a remosaic step (the stock
+camera ships a Sony remosaic library for it), so a plain Bayer debayer
+of that mode shows a regular colour lattice and looks soft. The full
+mode also runs at about 24 fps and costs the soft ISP four times the
+pixels.
+
+Add the 2304x1728 mode the stock camera uses for preview and video:
+2x2 binning over the whole pixel array, an ordinary Bayer image, line
+length 3488, frame length 2544, 798 Mbps per lane (link frequency
+399 MHz, pixel rate 319.2 MHz). The register values come from the stock
+camera module configuration (com.qti.sensormodule.liteon_imx371). The
+binned mode also enables the mapped couplet correction (0x0B05/0x0B06),
+as stock does.
+
+The mode needs the 399 MHz link frequency in the firmware; modes whose
+link frequency the endpoint doesn't list are not offered. List it in the
+OnePlus 6/6T device tree.
+
+Status: hypothesis until tested on the OnePlus 6 (compile-tested).
+---
+diff --git a/drivers/media/i2c/imx371.c b/drivers/media/i2c/imx371.c
+index 1fd750e..f668477 100644
+--- a/drivers/media/i2c/imx371.c
++++ b/drivers/media/i2c/imx371.c
+@@ -25,6 +25,10 @@
+ 
+ /* HBLANK control - read only */
+ #define IMX371_PPL_DEFAULT		6032
++#define IMX371_PPL_BINNED		3488
++
++/* Frame length of the 2x2 binned mode */
++#define IMX371_VTS_BINNED		2544
+ 
+ /* Exposure control */
+ #define IMX371_EXPOSURE_OFFSET		10
+@@ -107,6 +111,22 @@ struct imx371_mode {
+ 	struct v4l2_rect crop;
+ };
+ 
++/* 798 Mbps per lane (link frequency 399 MHz), for the 2x2 binned mode */
++static const struct cci_reg_sequence mipi_798mbps_24mhz_4l[] = {
++	{ CCS_R_EXTCLK_FREQUENCY_MHZ, 0x1800 },
++	{ CCS_R_VT_PIX_CLK_DIV, 5 },
++	{ CCS_R_VT_SYS_CLK_DIV, 4 },
++	{ CCS_R_PRE_PLL_CLK_DIV, 4 },
++	{ CCS_R_PLL_MULTIPLIER, 222 },
++	{ CCS_R_OP_SYS_CLK_DIV, 2 },
++	{ CCS_R_OP_PRE_PLL_CLK_DIV, 4 },
++	{ CCS_R_OP_PLL_MULTIPLIER, 266 },
++	{ CCS_R_PLL_MODE, 1 },
++	{ CCS_R_CSI_LANE_MODE, 3 },
++	{ IMX371_REG_REQ_LINK_BIT_RATE_MBPS_H, 798 * 4 },
++	{ IMX371_REG_REQ_LINK_BIT_RATE_MBPS_L, 0 },
++};
++
+ static const struct cci_reg_sequence mipi_1308mbps_24mhz_4l[] = {
+ 	{ CCS_R_EXTCLK_FREQUENCY_MHZ, 0x1800 },
+ 	{ CCS_R_VT_PIX_CLK_DIV, 5 },
+@@ -357,6 +377,86 @@ static const struct cci_reg_sequence mode_4656x3496_regs[] = {
+ 	{CCI_REG8(0x020F), 0x00},
+ };
+ 
++/*
++ * 2304x1728, 2x2 binning over the whole pixel array (full field of view).
++ * The IMX371 is a quad Bayer sensor: binning its 2x2 same-colour cells
++ * gives an ordinary Bayer image, which the full resolution mode is not
++ * without a remosaic step. Values from the OnePlus 6 stock camera module
++ * configuration (com.qti.sensormodule.liteon_imx371), the mode the stock
++ * camera uses for the front camera preview and video.
++ */
++static const struct cci_reg_sequence mode_2304x1728_regs[] = {
++	{CCI_REG8(0x0112), 0x0A},
++	{CCI_REG8(0x0113), 0x0A},
++	{CCI_REG8(0x0114), 0x03},
++	{CCI_REG8(0x0342), 0x0D},
++	{CCI_REG8(0x0343), 0xA0},
++	{CCI_REG8(0x0340), 0x09},
++	{CCI_REG8(0x0341), 0xF0},
++	{CCI_REG8(0x0344), 0x00},
++	{CCI_REG8(0x0345), 0x00},
++	{CCI_REG8(0x0346), 0x00},
++	{CCI_REG8(0x0347), 0x00},
++	{CCI_REG8(0x0348), 0x12},
++	{CCI_REG8(0x0349), 0x2F},
++	{CCI_REG8(0x034A), 0x0D},
++	{CCI_REG8(0x034B), 0xA7},
++	{CCI_REG8(0x0381), 0x01},
++	{CCI_REG8(0x0383), 0x01},
++	{CCI_REG8(0x0385), 0x01},
++	{CCI_REG8(0x0387), 0x01},
++	{CCI_REG8(0x0900), 0x01},
++	{CCI_REG8(0x0901), 0x22},
++	{CCI_REG8(0x0902), 0x08},
++	{CCI_REG8(0x3F4C), 0x81},
++	{CCI_REG8(0x3F4D), 0x81},
++	{CCI_REG8(0x4254), 0x7F},
++	{CCI_REG8(0x0401), 0x00},
++	{CCI_REG8(0x0404), 0x00},
++	{CCI_REG8(0x0405), 0x10},
++	{CCI_REG8(0x0408), 0x00},
++	{CCI_REG8(0x0409), 0x0C},
++	{CCI_REG8(0x040A), 0x00},
++	{CCI_REG8(0x040B), 0x0A},
++	{CCI_REG8(0x040C), 0x09},
++	{CCI_REG8(0x040D), 0x00},
++	{CCI_REG8(0x040E), 0x06},
++	{CCI_REG8(0x040F), 0xC0},
++	{CCI_REG8(0x034C), 0x09},
++	{CCI_REG8(0x034D), 0x00},
++	{CCI_REG8(0x034E), 0x06},
++	{CCI_REG8(0x034F), 0xC0},
++	{CCI_REG8(0xBC41), 0x01},
++	{CCI_REG8(0x0106), 0x00},
++	{CCI_REG8(0x0B00), 0x00},
++	{CCI_REG8(0x0B05), 0x01},
++	{CCI_REG8(0x0B06), 0x01},
++	{CCI_REG8(0x3230), 0x00},
++	{CCI_REG8(0x3602), 0x01},
++	{CCI_REG8(0x3C00), 0x7B},
++	{CCI_REG8(0x3C01), 0x69},
++	{CCI_REG8(0x3C02), 0x77},
++	{CCI_REG8(0x3C03), 0x66},
++	{CCI_REG8(0x3C04), 0x00},
++	{CCI_REG8(0x3C05), 0x9C},
++	{CCI_REG8(0x3C06), 0x14},
++	{CCI_REG8(0x3C07), 0x00},
++	{CCI_REG8(0x3C08), 0x01},
++	{CCI_REG8(0x3F14), 0x00},
++	{CCI_REG8(0x3F17), 0x00},
++	{CCI_REG8(0x3F3C), 0x00},
++	{CCI_REG8(0x3F78), 0x02},
++	{CCI_REG8(0x3F79), 0x44},
++	{CCI_REG8(0x3F7C), 0x00},
++	{CCI_REG8(0x3F7D), 0x00},
++	{CCI_REG8(0x0202), 0x09},
++	{CCI_REG8(0x0203), 0xDC},
++	{CCI_REG8(0x0204), 0x00},
++	{CCI_REG8(0x0205), 0x00},
++	{CCI_REG8(0x020E), 0x01},
++	{CCI_REG8(0x020F), 0x00},
++};
++
+ /*
+  * The supported formats.
+  * This table MUST contain 4 entries per format, to cover the various flip
+@@ -393,6 +493,7 @@ static const char * const imx371_supply_name[] = {
+ 
+ enum {
+ 	IMX371_LINK_FREQ_1308MBPS,
++	IMX371_LINK_FREQ_798MBPS,
+ };
+ 
+ /*
+@@ -419,6 +520,7 @@ static u64 link_freq_to_pixel_rate(u64 f, const struct imx371_link_cfg *link_cfg
+ 
+ static const s64 link_freq_menu_items_24[] = {
+ 	654000000ULL,
++	399000000ULL,
+ };
+ 
+ #define REGS(_list) { .num_of_regs = ARRAY_SIZE(_list), .regs = _list, }
+@@ -433,6 +535,15 @@ static const struct imx371_link_freq_config link_freq_configs_24[] = {
+ 			},
+ 		}
+ 	},
++	[IMX371_LINK_FREQ_798MBPS] = {
++		.pixels_per_line = IMX371_PPL_BINNED,
++		.link_cfg = {
++			[IMX371_4_LANE_MODE] = {
++				.lf_to_pix_rate_factor = 4,
++				.reg_list = REGS(mipi_798mbps_24mhz_4l),
++			},
++		}
++	},
+ };
+ 
+ static const struct imx371_mode supported_modes[] = {
+@@ -453,6 +564,24 @@ static const struct imx371_mode supported_modes[] = {
+ 			.height = IMX371_PIXEL_ARRAY_HEIGHT,
+ 		},
+ 	},
++	{
++		.width = 2304,
++		.height = 1728,
++		.vts_def = IMX371_VTS_BINNED,
++		.vts_min = IMX371_VTS_BINNED,
++		.reg_list = {
++			.num_of_regs = ARRAY_SIZE(mode_2304x1728_regs),
++			.regs = mode_2304x1728_regs,
++		},
++		.link_freq_index = IMX371_LINK_FREQ_798MBPS,
++		/* Binned 12,10 + 2304x1728 digital crop of the whole array */
++		.crop = {
++			.left = 24,
++			.top = 20,
++			.width = 4608,
++			.height = 3456,
++		},
++	},
+ };
+ 
+ struct imx371 {
+@@ -657,15 +786,28 @@ static int imx371_enum_frame_size(struct v4l2_subdev *sd,
+ {
+ 	struct imx371 *imx371 = to_imx371(sd);
+ 
+-	if (fse->index >= ARRAY_SIZE(supported_modes))
+-		return -EINVAL;
++	const struct imx371_mode *mode = NULL;
++	unsigned int i, n = 0;
+ 
+ 	if (fse->code != imx371_get_format_code(imx371))
+ 		return -EINVAL;
+ 
+-	fse->min_width = supported_modes[fse->index].width;
++	/* Skip the modes whose link frequency the firmware doesn't allow. */
++	for (i = 0; i < ARRAY_SIZE(supported_modes); i++) {
++		if (!(imx371->link_freq_bitmap &
++		      BIT(supported_modes[i].link_freq_index)))
++			continue;
++		if (n++ == fse->index) {
++			mode = &supported_modes[i];
++			break;
++		}
++	}
++	if (!mode)
++		return -EINVAL;
++
++	fse->min_width = mode->width;
+ 	fse->max_width = fse->min_width;
+-	fse->min_height = supported_modes[fse->index].height;
++	fse->min_height = mode->height;
+ 	fse->max_height = fse->min_height;
+ 
+ 	return 0;
+@@ -731,6 +873,8 @@ static int imx371_set_pad_format(struct v4l2_subdev *sd,
+ 	mode = v4l2_find_nearest_size(supported_modes,
+ 		ARRAY_SIZE(supported_modes), width, height,
+ 		fmt->format.width, fmt->format.height);
++	if (!(imx371->link_freq_bitmap & BIT(mode->link_freq_index)))
++		mode = &supported_modes[0];
+ 	imx371_update_pad_format(imx371, mode, fmt);
+ 	if (fmt->which == V4L2_SUBDEV_FORMAT_TRY) {
+ 		framefmt = v4l2_subdev_state_get_format(sd_state, fmt->pad);
+diff --git a/arch/arm64/boot/dts/qcom/sdm845-oneplus-common.dtsi b/arch/arm64/boot/dts/qcom/sdm845-oneplus-common.dtsi
+index b0b508f..e28b495 100644
+--- a/arch/arm64/boot/dts/qcom/sdm845-oneplus-common.dtsi
++++ b/arch/arm64/boot/dts/qcom/sdm845-oneplus-common.dtsi
+@@ -650,7 +650,7 @@
+ 			imx371_ep: endpoint {
+ 				remote-endpoint = <&csiphy2_ep>;
+ 				data-lanes = <1 2 3 4>;
+-				link-frequencies = /bits/ 64 <654000000>;
++				link-frequencies = /bits/ 64 <654000000 399000000>;
+ 			};
+ 		};
+ 	};

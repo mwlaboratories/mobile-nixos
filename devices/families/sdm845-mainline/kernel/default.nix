@@ -254,6 +254,9 @@ mobile-nixos.kernel-builder {
     ./0014-media-i2c-imx371-enable-mapped-couplet-correction.patch
     # Calls: silent downlink; v2/v3 CVP session selectable at runtime.
     ./0015-ASoC-qdsp6-q6voice-choose-the-CVP-session-version-at-runtime.patch
+    # Front camera: 2304x1728 2x2 binned full-FOV mode (quad Bayer sensor;
+    # the full mode needs a remosaic we don't have). Stock register values.
+    ./0016-media-i2c-imx371-add-a-2x2-binned-full-field-of-view-mode.patch
   ];
 
   nativeBuildInputs = [ buildPackages.python3 buildPackages.zstd buildPackages.kmod ];
