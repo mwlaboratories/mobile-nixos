@@ -13,4 +13,31 @@
   services.udev.extraRules = ''
     SUBSYSTEM=="dma_heap", KERNEL=="reserved|system|linux,cma", GROUP="video", MODE="0660", TAG+="uaccess"
   '';
+
+  # Both rear sensors report location "back", so WirePlumber names both
+  # nodes "Built-in Back Camera". GNOME Snapshot stores the chosen camera by
+  # that name and can't tell them apart. Name them by sensor; the node name
+  # comes from the libcamera ID, which is the DT path of the sensor:
+  #   cci i2c-bus@0 camera@1a  IMX519, main          -> "Back Camera"
+  #   cci i2c-bus@1 camera@10  IMX376K, second       -> "Back Camera 2"
+  #   (cci i2c-bus@0 camera@10 is the IMX371 front camera, left as is.)
+  # The second camera also gets a lower priority than the main one (750 by
+  # default for "back"), so the main camera stays the preferred rear one.
+  services.pipewire.wireplumber.extraConfig."51-enchilada-cameras" = {
+    "monitor.libcamera.rules" = [
+      {
+        matches = [ { "node.name" = "~libcamera_input.*i2c-bus_0_camera_1a"; } ];
+        actions.update-props = {
+          "node.description" = "Back Camera";
+        };
+      }
+      {
+        matches = [ { "node.name" = "~libcamera_input.*i2c-bus_1_camera_10"; } ];
+        actions.update-props = {
+          "node.description" = "Back Camera 2";
+          "priority.session" = 740;
+        };
+      }
+    ];
+  };
 }
