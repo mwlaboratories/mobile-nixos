@@ -241,6 +241,9 @@ mobile-nixos.kernel-builder {
     ./0008-ASoC-qdsp6-q6voice-move-a-running-call-to-a-new-port.patch
     # Venus encoder: let the device cap the frame size (encodes above 720p stall).
     ./0009-media-venus-venc-optional-ceiling-on-the-input-frame-size.patch
+    # Microphone: capture records zeros without the codec MCLK (fanzu8,
+    # github.com/fanzu8/pmos-device-fixes, verified on 6.16.7).
+    ./0010-ASoC-codecs-wcd934x-enable-MCLK-for-the-capture-path.patch
   ];
 
   nativeBuildInputs = [ buildPackages.python3 buildPackages.zstd buildPackages.kmod ];
