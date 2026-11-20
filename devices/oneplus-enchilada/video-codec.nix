@@ -5,26 +5,24 @@
   # encoder (venus_enc, qcom-venus-encoder) and decoder (venus_dec,
   # qcom-venus-decoder) through V4L2 mem2mem.
   #
-  # On kernel 7.4-rc3 (sdm845-linus) with the enchilada venus.mbn, the encoder
-  # is broken and takes the system down with it. Observed twice on 2026-11-19,
-  # with `gst-launch-1.0 videotestsrc ! v4l2h264enc ! fakesink`:
-  #  - 1080p NV12: no encoded frame in 60 s, then the firmware reported
-  #    "session error: event id:1001 (deadb000)", repeated 1006 errors and an
-  #    SFR restart;
-  #  - 720p NV12, next run: STREAMOFF hung in D state in
-  #    venus_helper_vb2_stop_streaming -> load_scale_v4, and storage I/O
-  #    stalled system-wide (jbd2 and fsync in D state, `sync` hung, journald
-  #    killed by its watchdog) for ~4.5 min, until venus logged "System error
-  #    has occurred, recovery failed to init HFI" and then "(recovered)";
-  #    I/O resumed at that same moment.
-  # (Why it spreads to I/O is a hypothesis: load_scale_v4 sets clocks and
-  # interconnect bandwidth under core->lock, so a stuck vote there may block
-  # the shared interconnect/RPMh path that UFS also needs.)
+  # Encoder status on kernel 7.4-rc3 with the enchilada venus.mbn, after the
+  # EOS fix (kernel patch 0007), measured 2026-11-20 with
+  # `videotestsrc num-buffers=90 ! NV12 ! v4l2h264enc`:
+  #  - 640x480, 960x544 and 1280x720 encode fine (720p: 68.6 fps on "snow",
+  #    48.2 fps from RGBA through videoconvert, 28.4 fps from the camera);
+  #  - 1440x1080 and 1920x1080 stall silently after STREAMON: no frame, no
+  #    error. (Earlier, before 0007, such stalls ended in a firmware fault and
+  #    once in a ~4.5 min system-wide storage stall.)
+  # Every working size needs only the lowest Venus clock (100 MHz) and every
+  # stalling one needs 200 MHz, so the clock switch is the prime suspect. Not
+  # yet proven.
   #
-  # Any GStreamer pipeline picks v4l2h264enc on its own (rank PRIMARY+1), and
-  # so does Snapshot once "hardware encoding" is switched on in its
-  # preferences. Keep the encoder module from loading, so a stray encode can't
-  # wedge the phone. The decoder is a separate module and stays available.
-  # Remove this once an encode test passes on a newer kernel or firmware.
-  boot.blacklistedKernelModules = [ "venus_enc" ];
+  # GStreamer ranks v4l2h264enc PRIMARY+1, and Snapshot uses it with
+  # "hardware encoding" on. So the encoder may load, but it only offers frames
+  # up to 1280x720 (kernel patch 0009). A larger stream is then scaled down by
+  # encodebin rather than handed to a size that hangs.
+  # Raise or drop this once 1080p encodes work.
+  boot.extraModprobeConfig = ''
+    options venus_enc max_width=1280 max_height=720
+  '';
 }
