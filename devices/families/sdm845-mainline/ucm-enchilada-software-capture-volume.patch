@@ -1,0 +1,39 @@
+--- a/ucm2/OnePlus/enchilada/HiFi.conf
++++ b/ucm2/OnePlus/enchilada/HiFi.conf
+@@ -76,8 +76,6 @@
+ 	Value {
+ 		CapturePriority 200
+ 		CapturePCM "hw:${CardId},1" # MultiMedia2
+-		CaptureMixerElem "ADC4"
+-		CaptureVolume "ADC4 Volume"
+ 	}
+ }
+ 
+@@ -114,8 +112,6 @@
+ 	Value {
+ 		CapturePriority 100
+ 		CapturePCM "hw:${CardId},3" # MultiMedia4
+-		CaptureMixerElem "ADC3"
+-		CaptureVolume "ADC3 Volume"
+ 	}
+ }
+ 
+@@ -160,8 +156,6 @@
+ 	Value {
+ 		CapturePriority 30
+ 		CapturePCM "hw:${CardId},5" # MultiMedia6
+-		CaptureMixerElem "ADC2"
+-		CaptureVolume "ADC2 Volume"
+ 		JackControl "Headphone Jack"
+ 	}
+ }
+--- a/ucm2/OnePlus/enchilada/VoiceCall.conf
++++ b/ucm2/OnePlus/enchilada/VoiceCall.conf
+@@ -115,7 +115,5 @@
+ 	Value {
+ 		CapturePriority 200
+ 		CapturePCM "hw:${CardId},1" # MultiMedia2
+-		CaptureMixerElem "ADC4"
+-		CaptureVolume "ADC4 Volume"
+ 	}
+ }

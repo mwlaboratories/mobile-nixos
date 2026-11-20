@@ -21,7 +21,12 @@
             hash = "sha256-Kg4vxDrli/ffNeUwDBL5GfdJsbwFRPAUieQEsjVKADw=";
           };
           # OnePlus 6: speakerphone in the "Voice Call" verb.
-          patches = [ ./ucm-enchilada-voicecall-speaker.patch ];
+          patches = [
+            ./ucm-enchilada-voicecall-speaker.patch
+            # ADCn Volume spans 0..+5 dB with the minimum as mute; PipeWire
+            # maps any source volume up to 100 % onto it and mutes the mic.
+            ./ucm-enchilada-software-capture-volume.patch
+          ];
         } ''
           mkdir -p $out/share/
           cp -rP --no-preserve=mode $src $out/share/alsa
