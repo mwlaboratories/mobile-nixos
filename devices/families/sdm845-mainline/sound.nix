@@ -20,9 +20,14 @@
             rev = "1b8d290e5aa2ca16b7f2fa8d74910ad19ef88b3a";
             hash = "sha256-Kg4vxDrli/ffNeUwDBL5GfdJsbwFRPAUieQEsjVKADw=";
           };
+          # OnePlus 6: speakerphone in the "Voice Call" verb.
+          patches = [ ./ucm-enchilada-voicecall-speaker.patch ];
         } ''
           mkdir -p $out/share/
-          ln -s $src $out/share/alsa
+          cp -rP --no-preserve=mode $src $out/share/alsa
+          for p in $patches; do
+            patch -d $out/share/alsa -p1 < $p
+          done
         ''
       ) {};
     })
