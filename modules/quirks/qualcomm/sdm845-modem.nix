@@ -86,7 +86,27 @@ in
       })
     ];
 
+    # VoLTE. The modem runs its own IMS stack but asks the AP, through the
+    # QMI "IMS Data" service (770), to bring up the IMS APN connection.
+    # 81voltd serves that and opens the bearer through ModemManager (as on
+    # postmarketOS, soc-qcom-modem). Without it calls can only use 2G/3G
+    # fallback. Whether the modem then registers IMS depends on the
+    # operator profile in the modem firmware.
+    systemd.packages = mkIf config.networking.modemmanager.enable [ pkgs._81voltd ];
+
     systemd.services = {
+      "81voltd" = mkIf config.networking.modemmanager.enable {
+        wantedBy = [ "multi-user.target" ];
+        # The packaged unit orders after "ModemManager.target", which
+        # doesn't exist.
+        after = [ "ModemManager.service" "qrtr-ns.service" ];
+        wants = [ "ModemManager.service" ];
+        requires = [ "qrtr-ns.service" ];
+        serviceConfig = {
+          Restart = "on-failure";
+          RestartSec = 5;
+        };
+      };
       rmtfs = {
         wantedBy = [ "multi-user.target" ];
         requires = [ "qrtr-ns.service" ];
