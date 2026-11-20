@@ -122,31 +122,24 @@ in
           Restart = "always";
         };
       };
+      # Activates the SIM's USIM application on the modem so ModemManager
+      # sees the SIM. The msm-modem script (as on postmarketOS) waits up to
+      # 45 s for the modem to answer on QRTR and 4 s for the card to show
+      # up; the inline script this replaces asked once, right after boot,
+      # and took a modem still starting for "no SIM". No SIM, or no USIM
+      # application, exits 0. Oneshot rather than the upstream Type=notify
+      # unit: the result is the same, and an exit without READY can't fail
+      # it.
       msm-modem-uim-selection = {
         enable = true;
+        after = [ "rmtfs.service" ];
+        requires = [ "rmtfs.service" ];
         before = [ "ModemManager.service" ];
-        wantedBy = [ "ModemManager.service" ];
-        path = with pkgs; [ libqmi gawk gnugrep ];
-        script = ''
-          QMICLI_MODEM="qmicli --silent -pd qrtr://0"
-          QMI_CARDS=$($QMICLI_MODEM --uim-get-card-status)
-          if ! printf "%s" "$QMI_CARDS" | grep -Fq "Primary GW:   session doesn't exist"
-          then
-              $QMICLI_MODEM --uim-change-provisioning-session='activate=no,session-type=primary-gw-provisioning' > /dev/null
-          fi
-          FIRST_PRESENT_SLOT=$(printf "%s" "$QMI_CARDS" | grep "Card state: 'present'" -m1 -B1 | head -n1 | cut -c7-7)
-          FIRST_PRESENT_AID=$(printf "%s" "$QMI_CARDS" | grep "usim (2)" -m1 -A3 | tail -n1 | awk '{print $1}')
-          # Without a SIM (or without a USIM application on it) there is no
-          # session to provision; that is not a failure.
-          if [ -z "$FIRST_PRESENT_SLOT" ] || [ -z "$FIRST_PRESENT_AID" ]; then
-              echo "No SIM card with a USIM application found (slot='$FIRST_PRESENT_SLOT', aid='$FIRST_PRESENT_AID'); not provisioning a session."
-              exit 0
-          fi
-          $QMICLI_MODEM --uim-change-provisioning-session="slot=$FIRST_PRESENT_SLOT,activate=yes,session-type=primary-gw-provisioning,aid=$FIRST_PRESENT_AID" > /dev/null
-        '';
+        wantedBy = [ "ModemManager.service" "multi-user.target" ];
         serviceConfig = {
           Type = "oneshot";
           RemainAfterExit = true;
+          ExecStart = "${pkgs.msm-modem}/libexec/msm-modem-uim-selection";
         };
       };
     };
