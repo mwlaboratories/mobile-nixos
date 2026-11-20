@@ -1,0 +1,71 @@
+From: mwlaboratories <info@mwlabs.be>
+Subject: [PATCH] media: i2c: imx519: let the supplies settle and reset the sensor after power up
+
+On the OnePlus 6 the main camera powers down after every stream and up
+again at the next. Measured with a loop of 25-30 stream starts in one
+libcamera process: 8/25 to 15/30 of the starts stopped after 0-4 frames
+(the VFE stops seeing frames; no CSID error), and twice the first
+register write after power up timed out on the CCI bus. With the sensor
+kept powered between the starts (runtime PM forbidden), 0/30 and 0/30.
+The IMX371 and IMX376 in the same phone, whose drivers software-reset
+the sensor and wait 12 ms before programming it, stall 0/20.
+
+The analogue and core supplies are GPIO load switches without a startup
+delay in the device tree, and the driver releases XCLR right after
+enabling them. Wait 2 ms for the supplies before starting the clock and
+releasing XCLR, and software-reset the sensor (12 ms) before writing the
+common registers after a power up.
+
+Status: hypothesis until tested on the OnePlus 6 (compile-tested). The
+stall itself and its power-cycle dependence are measured.
+---
+diff --git a/drivers/media/i2c/imx519.c b/drivers/media/i2c/imx519.c
+index 3c62107..349c6a6 100644
+--- a/drivers/media/i2c/imx519.c
++++ b/drivers/media/i2c/imx519.c
+@@ -876,6 +876,16 @@ static const char * const imx519_supply_name[] = {
+ #define IMX519_XCLR_MIN_DELAY_US	8000
+ #define IMX519_XCLR_DELAY_RANGE_US	1000
+ 
++/*
++ * Time for the supplies to settle before the clock starts and XCLR goes high.
++ * On the OnePlus 6/6T the analogue and core supplies are GPIO load switches
++ * without a startup delay in the device tree.
++ */
++#define IMX519_SUPPLY_SETTLE_US		2000
++
++/* Time after a software reset before the sensor accepts register writes */
++#define IMX519_SW_RESET_DELAY_US	12000
++
+ struct imx519 {
+ 	struct v4l2_subdev sd;
+ 	struct media_pad pad[NUM_PADS];
+@@ -1359,6 +1369,19 @@ static int imx519_start_streaming(struct imx519 *imx519)
+ 	int ret;
+ 
+ 	if (!imx519->common_regs_written) {
++		/*
++		 * Start from a clean state after power up: without the reset,
++		 * a fraction of the streams started after a power cycle stop
++		 * after a few frames, and the first write sometimes times out.
++		 */
++		ret = cci_write(imx519->regmap, CCS_R_SOFTWARE_RESET, 0x01, NULL);
++		if (ret) {
++			dev_err(&client->dev, "%s failed to reset sensor\n",
++				__func__);
++			return ret;
++		}
++		fsleep(IMX519_SW_RESET_DELAY_US);
++
+ 		ret = cci_multi_reg_write(imx519->regmap, mode_common_regs,
+ 					  ARRAY_SIZE(mode_common_regs), NULL);
+ 		if (ret) {
+@@ -1474,6 +1497,8 @@ static int imx519_power_on(struct device *dev)
+ 		return ret;
+ 	}
+ 
++	usleep_range(IMX519_SUPPLY_SETTLE_US, IMX519_SUPPLY_SETTLE_US + 500);
++
+ 	ret = clk_prepare_enable(imx519->xclk);
+ 	if (ret) {
+ 		dev_err(&client->dev, "%s: failed to enable clock\n",

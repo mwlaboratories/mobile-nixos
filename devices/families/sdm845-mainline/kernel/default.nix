@@ -260,6 +260,10 @@ mobile-nixos.kernel-builder {
     # Cameras: a failed stream start left VFE/CSID/CSIPHY marked streaming,
     # so the next start got no frames.
     ./0017-media-qcom-camss-stop-the-started-subdevs-when-a-stream-fails-to-start.patch
+    # Main camera: 25-50% of the streams started after a power cycle stop
+    # after 0-4 frames ("no image"); 0% when kept powered. Supplies settle
+    # and a software reset after power up.
+    ./0018-media-i2c-imx519-let-the-supplies-settle-and-reset-after-power-up.patch
   ];
 
   nativeBuildInputs = [ buildPackages.python3 buildPackages.zstd buildPackages.kmod ];
