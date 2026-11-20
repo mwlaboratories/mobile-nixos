@@ -1,7 +1,7 @@
 From 0ac4bc85e69c7c098fe7a922e3f6b821a3127441 Mon Sep 17 00:00:00 2001
 From: Jayden Milne <linux@jayd.ml>
 Date: Fri, 20 Nov 2026 11:31:52 +0100
-Subject: [PATCH 1/8] libcamera: software_isp: Gather focus statistics
+Subject: [PATCH 1/9] libcamera: software_isp: Gather focus statistics
 
 Backported to v0.7.2 from jaydens-tasty-slop/libcamera d28ddfc (tests dropped).
 ---

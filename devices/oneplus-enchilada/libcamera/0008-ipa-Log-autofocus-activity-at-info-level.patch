@@ -1,7 +1,7 @@
-From 1ac9c6b2945f3db38f5e27e7b877781d80f814a7 Mon Sep 17 00:00:00 2001
+From c256f418bd344d3991a8b6e221d2168fc020029a Mon Sep 17 00:00:00 2001
 From: mwlaboratories <info@mwlabs.be>
 Date: Fri, 20 Nov 2026 12:18:02 +0100
-Subject: [PATCH 8/8] ipa: Log autofocus activity at info level
+Subject: [PATCH 8/9] ipa: Log autofocus activity at info level
 
 Log the initial AF mode and lens range, mode changes, and scan start and result at info level, so that AF can be followed in the logs of an application such as WirePlumber. Lens movements are logged at debug level.
 ---

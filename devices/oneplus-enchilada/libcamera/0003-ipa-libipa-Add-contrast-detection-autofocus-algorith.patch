@@ -1,7 +1,7 @@
 From 39751ceb948c84b470c94204b4dde16dd4534a1f Mon Sep 17 00:00:00 2001
 From: Jayden Milne <linux@jayd.ml>
 Date: Fri, 20 Nov 2026 11:33:46 +0100
-Subject: [PATCH 3/8] ipa: libipa: Add contrast detection autofocus algorithm
+Subject: [PATCH 3/9] ipa: libipa: Add contrast detection autofocus algorithm
 
 Backported to v0.7.2 from jaydens-tasty-slop/libcamera 3b64862.
 ---

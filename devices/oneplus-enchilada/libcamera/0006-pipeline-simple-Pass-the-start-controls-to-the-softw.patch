@@ -1,7 +1,7 @@
 From ab58eaa2e789abbae2c8d69d59dbedea5f1e9107 Mon Sep 17 00:00:00 2001
 From: mwlaboratories <info@mwlabs.be>
 Date: Fri, 20 Nov 2026 12:17:15 +0100
-Subject: [PATCH 6/8] pipeline: simple: Pass the start controls to the software
+Subject: [PATCH 6/9] pipeline: simple: Pass the start controls to the software
  ISP IPA
 
 SimplePipelineHandler::start() ignored its controls, so controls an application sets at start (PipeWire sets AfMode to continuous there) never reached the soft IPA. Keep them and merge them into the first request queued to the software ISP, the request's own controls taking precedence.

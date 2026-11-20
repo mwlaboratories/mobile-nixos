@@ -18,6 +18,8 @@ let
       # Gain models and black levels: without them AGC never raised the gain.
       ./libcamera/0007-ipa-libipa-camera_sensor_helper-Add-IMX371-IMX376-an.patch
       ./libcamera/0008-ipa-Log-autofocus-activity-at-info-level.patch
+      # Upstream 7ebae537 (2026-10-29): clipped highlights skewed AWB (cast).
+      ./libcamera/0009-libcamera-software_isp-Exclude-saturated-pixels-from.patch
     ];
   });
 in

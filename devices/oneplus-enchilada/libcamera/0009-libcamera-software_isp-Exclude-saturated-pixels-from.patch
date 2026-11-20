@@ -1,0 +1,200 @@
+From 26bbd7a7bb3c43671bd518571faf5c8177b0c367 Mon Sep 17 00:00:00 2001
+From: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+Date: Fri, 20 Nov 2026 12:24:15 +0100
+Subject: [PATCH 9/9] libcamera: software_isp: Exclude saturated pixels from
+ AWB statistics
+
+Saturated pixels skew the per-channel means used by AWB and shift the hue of the image. Accumulate unsaturated pixels only (95% threshold).
+
+Backported to v0.7.2 (on top of the focus statistics) from upstream commit 7ebae537183f (2026-10-29), reviewed by Hans de Goede, Milan Zamazal and Kieran Bingham, tested by Robert Mader.
+---
+ .../internal/software_isp/swisp_stats.h       | 29 ++++++++++----
+ src/ipa/simple/algorithms/awb.cpp             | 14 +++++--
+ src/libcamera/software_isp/swstats_cpu.cpp    | 40 ++++++++++++++-----
+ 3 files changed, 60 insertions(+), 23 deletions(-)
+
+diff --git a/include/libcamera/internal/software_isp/swisp_stats.h b/include/libcamera/internal/software_isp/swisp_stats.h
+index 09f9e6d..b5395c1 100644
+--- a/include/libcamera/internal/software_isp/swisp_stats.h
++++ b/include/libcamera/internal/software_isp/swisp_stats.h
+@@ -15,15 +15,24 @@
+ namespace libcamera {
+ 
+ /**
+- * \brief Struct that holds the statistics for the Software ISP
++ * \brief Statistics for the Software ISP
+  *
+- * The struct value types are large enough to not overflow.
+- * Should they still overflow for some reason, no check is performed and they
+- * wrap around.
++ * The software ISP computes three types of statistics:
+  *
+- * The focus statistics divide the statistics window in a grid of regions and
+- * measure the high frequency content of the green channel in each of them,
+- * for use by contrast detection autofocus algorithms.
++ * - The accumulator counts the number of non-saturated pixels and sums their
++ *   R, G and B channels individually. Pixels that have any saturated channel
++ *   are skipped as they don't provide accurate colour information due to
++ *   clipping.
++ *
++ * - The histogram groups pixels in bins based on their luminance and counts
++ *   the number of pixels in each bin. Saturated pixels are included.
++ *
++ * - The focus statistics divide the statistics window in a grid of regions
++ *   and measure the high frequency content of the green channel in each of
++ *   them, for use by contrast detection autofocus algorithms.
++ *
++ * The value types are large enough to not overflow. Should they still overflow
++ * for some reason, no check is performed and they wrap around.
+  */
+ struct SwIspStats {
+ 	/**
+@@ -32,9 +41,13 @@ struct SwIspStats {
+ 	 */
+ 	bool valid;
+ 	/**
+-	 * \brief Sums of colour channels of all the sampled pixels
++	 * \brief Sums of colour channels of all the unsaturated pixels
+ 	 */
+ 	RGB<uint64_t> sum_;
++	/**
++	 * \brief Number of unsaturated pixels accumulated in \a sum_
++	 */
++	uint64_t numPixels_;
+ 	/**
+ 	 * \brief Number of bins in the yHistogram
+ 	 */
+diff --git a/src/ipa/simple/algorithms/awb.cpp b/src/ipa/simple/algorithms/awb.cpp
+index 05155c8..2398055 100644
+--- a/src/ipa/simple/algorithms/awb.cpp
++++ b/src/ipa/simple/algorithms/awb.cpp
+@@ -7,7 +7,6 @@
+ 
+ #include "awb.h"
+ 
+-#include <numeric>
+ #include <stdint.h>
+ 
+ #include <libcamera/base/log.h>
+@@ -49,7 +48,6 @@ void Awb::process(IPAContext &context,
+ 		  const SwIspStats *stats,
+ 		  ControlList &metadata)
+ {
+-	const SwIspStats::Histogram &histogram = stats->yHistogram;
+ 	const uint8_t blackLevel = context.activeState.blc.level;
+ 
+ 	metadata.set(controls::ColourGains, { frameContext.gains.r(),
+@@ -58,13 +56,21 @@ void Awb::process(IPAContext &context,
+ 	if (!stats->valid)
+ 		return;
+ 
++	const uint64_t nPixels = stats->numPixels_;
++
++	/*
++	 * In the unlikely case where all pixels are saturated, keep the
++	 * current gains. This shouldn't happen in normal conditions but can be
++	 * triggered by severe over-exposure.
++	 */
++	if (!nPixels)
++		return;
++
+ 	/*
+ 	 * Black level must be subtracted to get the correct AWB ratios, they
+ 	 * would be off if they were computed from the whole brightness range
+ 	 * rather than from the sensor range.
+ 	 */
+-	const uint64_t nPixels = std::accumulate(
+-		histogram.begin(), histogram.end(), uint64_t(0));
+ 	const uint64_t offset = blackLevel * nPixels;
+ 	const uint64_t minValid = 1;
+ 	/*
+diff --git a/src/libcamera/software_isp/swstats_cpu.cpp b/src/libcamera/software_isp/swstats_cpu.cpp
+index e8f3183..724a9ad 100644
+--- a/src/libcamera/software_isp/swstats_cpu.cpp
++++ b/src/libcamera/software_isp/swstats_cpu.cpp
+@@ -181,6 +181,14 @@ SwStatsCpu::SwStatsCpu(const CameraManager &cm)
+ 			<< "Failed to create shared memory for statistics";
+ }
+ 
++/*
++ * Hardcode the AWB stats saturation threshold to 95% of the maximum value.
++ *
++ * \todo Investigate if this should be made dynamic, based on sensor
++ * (non-)linearity and noise level.
++ */
++static constexpr unsigned int kSaturationThreshold = 0.95 * 256;
++
+ static constexpr unsigned int kRedYMul = 77; /* 0.299 * 256 */
+ static constexpr unsigned int kGreenYMul = 150; /* 0.587 * 256 */
+ static constexpr unsigned int kBlueYMul = 29; /* 0.114 * 256 */
+@@ -199,6 +207,7 @@ static constexpr unsigned int kBlueYMul = 29; /* 0.114 * 256 */
+ 	uint64_t sumR = 0;                                         \
+ 	uint64_t sumG = 0;                                         \
+ 	uint64_t sumB = 0;                                         \
++	uint64_t nSamples = 0;                                     \
+                                                                    \
+ 	SwIspStats::FocusRegion *focusRegion = focusRow(y, stats); \
+ 	const unsigned int *focusEnd = focusColumnEnd_.data();     \
+@@ -231,16 +240,21 @@ static constexpr unsigned int kBlueYMul = 29; /* 0.114 * 256 */
+ 	focusCount++;                         \
+ 	gPrev = g;
+ 
+-#define SWSTATS_ACCUMULATE_LINE_STATS(div) \
+-	SWSTATS_ACCUMULATE_FOCUS_STATS()   \
+-                                           \
+-	sumR += r;                         \
+-	sumG += g;                         \
+-	sumB += b;                         \
+-                                           \
+-	yVal = r * kRedYMul;               \
+-	yVal += g * kGreenYMul;            \
+-	yVal += b * kBlueYMul;             \
++#define SWSTATS_ACCUMULATE_LINE_STATS(div)      \
++	SWSTATS_ACCUMULATE_FOCUS_STATS()        \
++                                                \
++	if (r < kSaturationThreshold * (div) && \
++	    g < kSaturationThreshold * (div) && \
++	    b < kSaturationThreshold * (div)) { \
++		sumR += r;                      \
++		sumG += g;                      \
++		sumB += b;                      \
++		nSamples++;                     \
++	}                                       \
++                                                \
++	yVal = r * kRedYMul;                    \
++	yVal += g * kGreenYMul;                 \
++	yVal += b * kBlueYMul;                  \
+ 	stats.yHistogram[yVal * SwIspStats::kYHistogramSize / (256 * 256 * (div))]++;
+ 
+ #define SWSTATS_FINISH_LINE_STATS() \
+@@ -248,7 +262,8 @@ static constexpr unsigned int kBlueYMul = 29; /* 0.114 * 256 */
+                                     \
+ 	stats.sum_.r() += sumR;     \
+ 	stats.sum_.g() += sumG;     \
+-	stats.sum_.b() += sumB;
++	stats.sum_.b() += sumB;     \
++	stats.numPixels_ += nSamples;
+ 
+ SwIspStats::FocusRegion *SwStatsCpu::focusRow(unsigned int y, SwIspStats &stats) const
+ {
+@@ -456,6 +471,7 @@ void SwStatsCpu::startFrame(uint32_t frame)
+ 
+ 	for (auto &s : stats_) {
+ 		s.sum_ = RGB<uint64_t>({ 0, 0, 0 });
++		s.numPixels_ = 0;
+ 		s.yHistogram.fill(0);
+ 		s.focus.fill({});
+ 	}
+@@ -474,10 +490,12 @@ void SwStatsCpu::finishFrame(uint32_t frame, uint32_t bufferId)
+ 
+ 	if (valid) {
+ 		sharedStats_->sum_ = RGB<uint64_t>({ 0, 0, 0 });
++		sharedStats_->numPixels_ = 0;
+ 		sharedStats_->yHistogram.fill(0);
+ 		sharedStats_->focus.fill({});
+ 		for (const auto &s : stats_) {
+ 			sharedStats_->sum_ += s.sum_;
++			sharedStats_->numPixels_ += s.numPixels_;
+ 			for (unsigned int j = 0; j < SwIspStats::kYHistogramSize; j++)
+ 				sharedStats_->yHistogram[j] += s.yHistogram[j];
+ 			for (unsigned int j = 0; j < s.focus.size(); j++) {

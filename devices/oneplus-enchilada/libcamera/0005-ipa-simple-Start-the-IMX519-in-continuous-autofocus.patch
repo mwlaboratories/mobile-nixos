@@ -1,7 +1,7 @@
 From c1f0bc2324c10ba34c8125b3187f2a5ed739acd5 Mon Sep 17 00:00:00 2001
 From: mwlaboratories <info@mwlabs.be>
 Date: Fri, 20 Nov 2026 11:35:31 +0100
-Subject: [PATCH 5/8] ipa: simple: Start the IMX519 in continuous autofocus
+Subject: [PATCH 5/9] ipa: simple: Start the IMX519 in continuous autofocus
 
 Add a 'mode' tuning key to AfContrast that selects the initial AfMode (and the AfMode default), and an imx519.yaml tuning file that starts in continuous autofocus: GNOME Snapshot and PipeWire never set AfMode.
 ---

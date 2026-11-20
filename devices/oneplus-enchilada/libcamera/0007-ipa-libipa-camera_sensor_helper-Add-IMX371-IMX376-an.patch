@@ -1,16 +1,21 @@
-From 08f842c60c4a7935ffe80af08b11c87f5f033135 Mon Sep 17 00:00:00 2001
+From 447dad6609a1b4d1f7894a71e29f316f353f3237 Mon Sep 17 00:00:00 2001
 From: mwlaboratories <info@mwlabs.be>
 Date: Fri, 20 Nov 2026 12:17:40 +0100
-Subject: [PATCH 7/8] ipa: libipa: camera_sensor_helper: Add IMX371, IMX376 and
+Subject: [PATCH 7/9] ipa: libipa: camera_sensor_helper: Add IMX371, IMX376 and
  IMX519
 
-Without a helper the soft IPA works in raw gain codes, and with a default code of 0 its AGC never raises the gain: the OnePlus 6 cameras stayed dark. Analogue gain models from the driver ranges (16x at the maximum code), black level 64 at 10 bits.
+Without a helper the soft IPA works in raw gain codes, and with a default
+code of 0 its AGC never raises the gain: the OnePlus 6 cameras stayed
+dark. All three use 1024 / (1024 - code), 16x at code 960 (IMX519 as in
+the Raspberry Pi helper; IMX371/376 as in the OnePlus 6T postmarketOS
+camera stack, which cites the OxygenOS sensor library). Black level 64 at
+10 bits.
 ---
  src/ipa/libipa/camera_sensor_helper.cpp | 43 +++++++++++++++++++++++++
  1 file changed, 43 insertions(+)
 
 diff --git a/src/ipa/libipa/camera_sensor_helper.cpp b/src/ipa/libipa/camera_sensor_helper.cpp
-index 9457d62..561612c 100644
+index 9457d62..b70c981 100644
 --- a/src/ipa/libipa/camera_sensor_helper.cpp
 +++ b/src/ipa/libipa/camera_sensor_helper.cpp
 @@ -617,6 +617,34 @@ public:
@@ -18,10 +23,10 @@ index 9457d62..561612c 100644
  REGISTER_CAMERA_SENSOR_HELPER("imx335", CameraSensorHelperImx335)
  
 +/*
-+ * IMX371 and IMX376: the drivers allow analogue gain codes up to 480, which
-+ * is 16x with the 512 / (512 - code) model of the other Sony mobile sensors
-+ * (IMX214, IMX258). Black level as for those sensors, 64 at 10 bits. Not
-+ * verified against a datasheet.
++ * IMX371 and IMX376: 1024 / (1024 - code), 16x at code 960, as in the
++ * OnePlus 6T postmarketOS camera stack (github.com/lolren/oneplus6t-pmos-fixes),
++ * which cites the OxygenOS sensor library clamping the gain to 16x and the
++ * code to 960. Black level 64 at 10 bits. Not verified against a datasheet.
 + */
 +class CameraSensorHelperImx371 : public CameraSensorHelper
 +{
@@ -29,7 +34,7 @@ index 9457d62..561612c 100644
 +	CameraSensorHelperImx371()
 +	{
 +		blackLevel_ = 4096;
-+		gain_ = AnalogueGainLinear{ 0, 512, -1, 512 };
++		gain_ = AnalogueGainLinear{ 0, 1024, -1, 1024 };
 +	}
 +};
 +REGISTER_CAMERA_SENSOR_HELPER("imx371", CameraSensorHelperImx371)
@@ -40,7 +45,7 @@ index 9457d62..561612c 100644
 +	CameraSensorHelperImx376()
 +	{
 +		blackLevel_ = 4096;
-+		gain_ = AnalogueGainLinear{ 0, 512, -1, 512 };
++		gain_ = AnalogueGainLinear{ 0, 1024, -1, 1024 };
 +	}
 +};
 +REGISTER_CAMERA_SENSOR_HELPER("imx376", CameraSensorHelperImx376)
