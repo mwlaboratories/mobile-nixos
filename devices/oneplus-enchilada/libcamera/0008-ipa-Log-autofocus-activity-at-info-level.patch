@@ -1,9 +1,9 @@
-From 55bfbca76e2e162ff003af2314f394deec5c3f57 Mon Sep 17 00:00:00 2001
+From 1ac9c6b2945f3db38f5e27e7b877781d80f814a7 Mon Sep 17 00:00:00 2001
 From: mwlaboratories <info@mwlabs.be>
 Date: Fri, 20 Nov 2026 12:18:02 +0100
 Subject: [PATCH 8/8] ipa: Log autofocus activity at info level
 
-Log the initial AF mode and lens range, mode changes, scan start and result, and every lens movement at info level, so that AF can be followed in the logs of an application such as WirePlumber.
+Log the initial AF mode and lens range, mode changes, and scan start and result at info level, so that AF can be followed in the logs of an application such as WirePlumber. Lens movements are logged at debug level.
 ---
  src/ipa/libipa/af_contrast.cpp   | 10 +++++++---
  src/ipa/simple/algorithms/af.cpp |  4 +++-
@@ -52,7 +52,7 @@ index 0544baf..8a35cde 100644
  		<< ", contrast " << contrast << " (range " << scanMinContrast_
  		<< " - " << scanMaxContrast_ << ")";
 diff --git a/src/ipa/simple/algorithms/af.cpp b/src/ipa/simple/algorithms/af.cpp
-index e04c496..d4d52ab 100644
+index e04c496..093d918 100644
 --- a/src/ipa/simple/algorithms/af.cpp
 +++ b/src/ipa/simple/algorithms/af.cpp
 @@ -150,8 +150,10 @@ void Af::process(IPAContext &context, const uint32_t frame,
@@ -61,7 +61,7 @@ index e04c496..d4d52ab 100644
  
 -	if (std::optional<int32_t> setting = af_.lensSetting())
 +	if (std::optional<int32_t> setting = af_.lensSetting()) {
-+		LOG(IPASoftAf, Info) << "Frame " << frame << ": lens to " << *setting;
++		LOG(IPASoftAf, Debug) << "Frame " << frame << ": lens to " << *setting;
  		context.activeState.lens.focusPosition = *setting;
 +	}
  }
