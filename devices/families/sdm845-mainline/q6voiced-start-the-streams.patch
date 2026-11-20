@@ -1,0 +1,49 @@
+--- a/q6voiced.c
++++ b/q6voiced.c
+@@ -10,6 +10,31 @@
+ 	snd_pcm_t *tx, *rx;
+ };
+ 
++/*
++ * Start a prepared hostless stream. The q6voice DAI moves no data, but the
++ * start triggers the DPCM back ends, and codecs such as the WCD934x only
++ * enable their SLIMbus channels on trigger. Without it the DSP voice
++ * session runs while the codec side stays silent in both directions.
++ * Playback starts empty, so stop only at the boundary (never on underrun).
++ */
++static int q6voiced_start(snd_pcm_t *pcm)
++{
++	snd_pcm_sw_params_t *sw;
++	snd_pcm_uframes_t boundary;
++
++	snd_pcm_sw_params_alloca(&sw);
++	int err;
++
++	if ((err = snd_pcm_sw_params_current(pcm, sw)) < 0 ||
++	    (err = snd_pcm_sw_params_get_boundary(sw, &boundary)) < 0 ||
++	    (err = snd_pcm_sw_params_set_stop_threshold(pcm, sw, boundary)) < 0 ||
++	    (err = snd_pcm_sw_params(pcm, sw)) < 0 ||
++	    (err = snd_pcm_prepare(pcm)) < 0)
++		return err;
++
++	return snd_pcm_start(pcm);
++}
++
+ static void q6voiced_open(struct q6voiced *v)
+ {
+ 	if (v->tx)
+@@ -33,6 +58,14 @@
+ 	}
+ 
+ 	printf("PCM devices were opened.\n");
++
++	int err = q6voiced_start(v->tx);
++	if (err >= 0)
++		err = q6voiced_start(v->rx);
++	if (err < 0)
++		fprintf(stderr, "Failed to start the PCM devices: %s\n", snd_strerror(err));
++	else
++		printf("PCM devices were started.\n");
+ 	return;
+ 
+ error:
