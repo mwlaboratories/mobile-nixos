@@ -1,0 +1,31 @@
+From: mwlaboratories <info@mwlabs.be>
+Subject: [PATCH] media: i2c: imx519: default the C-PHY 1080p and 720p modes to 30 fps
+
+The 1920x1080 and 1280x720 modes default to 60 and 120 fps, which caps
+the exposure at about 1/53 s and 1/105 s (with the minimum blanking).
+On the OnePlus 6 the software ISP delivers about 30 fps anyway, so the
+short frames only cost light. Default both to 30 fps; the minimum frame
+intervals are unchanged, so higher rates can still be requested.
+
+Status: hypothesis until tested on the OnePlus 6.
+---
+--- a/drivers/media/i2c/imx519.c
++++ b/drivers/media/i2c/imx519.c
+@@ -764,7 +764,7 @@
+ 		},
+ 		.timeperframe_default = {
+ 			.numerator = 100,
+-			.denominator = 6000
++			.denominator = 3000
+ 		},
+ 		.reg_list = {
+ 			.num_of_regs = ARRAY_SIZE(mode_1920x1080_cphy_regs),
+@@ -788,7 +788,7 @@
+ 		},
+ 		.timeperframe_default = {
+ 			.numerator = 100,
+-			.denominator = 12000
++			.denominator = 3000
+ 		},
+ 		.reg_list = {
+ 			.num_of_regs = ARRAY_SIZE(mode_1280x720_cphy_regs),

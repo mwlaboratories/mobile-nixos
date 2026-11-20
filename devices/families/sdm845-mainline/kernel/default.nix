@@ -248,6 +248,8 @@ mobile-nixos.kernel-builder {
     ./0011-media-i2c-imx371-imx376-allow-analogue-gain-up-to-16x.patch
     # Main camera: 47 black lines at 720p (no vertical blanking on C-PHY).
     ./0012-media-i2c-imx519-enforce-a-minimum-vertical-blanking.patch
+    # Main camera: 30 fps default at 1080p/720p, so AGC may expose to 1/30 s.
+    ./0013-media-i2c-imx519-default-the-C-PHY-1080p-and-720p-modes-to-30-fps.patch
   ];
 
   nativeBuildInputs = [ buildPackages.python3 buildPackages.zstd buildPackages.kmod ];
