@@ -76,7 +76,15 @@
   # VoiceMMode1 is PCM 6 on card 0: sdm845-oneplus-common.dtsi (OnePlus 6
   # and 6T) lists MultiMedia1-6, then VoiceMMode1 (as on postmarketOS).
   systemd.packages = [ pkgs.q6voiced ];
-  systemd.services.q6voiced.wantedBy = [ "multi-user.target" ];
+  systemd.services.q6voiced = {
+    wantedBy = [ "multi-user.target" ];
+    # q6voiced reports with printf(); to the journal (not a tty) stdout is
+    # block-buffered, so "PCM devices were opened/closed" never showed up.
+    serviceConfig.ExecStart = [
+      ""
+      "${pkgs.coreutils}/bin/stdbuf -oL ${pkgs.q6voiced}/bin/q6voiced hw:\${q6voice_card},\${q6voice_device}"
+    ];
+  };
   environment.etc."q6voiced/q6voiced.conf".text = ''
     q6voice_card=0
     q6voice_device=6
