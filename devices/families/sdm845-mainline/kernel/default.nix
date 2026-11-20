@@ -239,6 +239,8 @@ mobile-nixos.kernel-builder {
     ./0007-media-venus-venc-signal-EOS-with-a-real-buffer.patch
     # Speakerphone during a call: the voice session follows a port change.
     ./0008-ASoC-qdsp6-q6voice-move-a-running-call-to-a-new-port.patch
+    # Venus encoder: let the device cap the frame size (encodes above 720p stall).
+    ./0009-media-venus-venc-optional-ceiling-on-the-input-frame-size.patch
   ];
 
   nativeBuildInputs = [ buildPackages.python3 buildPackages.zstd buildPackages.kmod ];

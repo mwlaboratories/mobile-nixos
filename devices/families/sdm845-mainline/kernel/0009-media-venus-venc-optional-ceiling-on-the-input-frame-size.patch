@@ -1,0 +1,89 @@
+From: mwlaboratories <info@mwlabs.be>
+Subject: [PATCH] media: venus: venc: optional ceiling on the input frame size
+
+On the OnePlus 6 (sdm845, venus 5.2, 7.4-rc3) encodes up to 1280x720
+work, while 1440x1080 and 1920x1080 stall silently after STREAMON: no
+frame out, no error. The root cause is still under investigation.
+
+Add two module parameters, max_width and max_height, that lower the
+frame size the encoder advertises (VIDIOC_ENUM_FRAMESIZES,
+VIDIOC_ENUM_FRAMEINTERVALS) and accepts (VIDIOC_TRY_FMT/S_FMT). With
+them set, GStreamer negotiates a size the hardware can run (encodebin
+scales down) instead of hanging. The default, 0, keeps the firmware's
+limit.
+
+Status: workaround; drop once large encodes work.
+---
+--- a/drivers/media/platform/qcom/venus/venc.c
++++ b/drivers/media/platform/qcom/venus/venc.c
+@@ -25,6 +25,33 @@
+ #define VENC_EOS_BUF_SIZE	SZ_4K
+ 
+ /*
++ * Optional ceiling on the input frame size, below what the firmware
++ * advertises, for platforms where larger encodes are known to stall.
++ * 0 keeps the firmware's limit.
++ */
++static unsigned int max_width;
++module_param(max_width, uint, 0444);
++MODULE_PARM_DESC(max_width, "Largest input frame width offered (0 = firmware limit)");
++
++static unsigned int max_height;
++module_param(max_height, uint, 0444);
++MODULE_PARM_DESC(max_height, "Largest input frame height offered (0 = firmware limit)");
++
++static u32 venc_width_max(struct venus_inst *inst)
++{
++	u32 fw = frame_width_max(inst);
++
++	return max_width ? min(fw, max_width) : fw;
++}
++
++static u32 venc_height_max(struct venus_inst *inst)
++{
++	u32 fw = frame_height_max(inst);
++
++	return max_height ? min(fw, max_height) : fw;
++}
++
++/*
+  * Three resons to keep MPLANE formats (despite that the number of planes
+  * currently is one):
+  * - the MPLANE formats allow only one plane to be used
+@@ -197,9 +224,9 @@
+ 	}
+ 
+ 	pixmp->width = clamp(pixmp->width, frame_width_min(inst),
+-			     frame_width_max(inst));
++			     venc_width_max(inst));
+ 	pixmp->height = clamp(pixmp->height, frame_height_min(inst),
+-			      frame_height_max(inst));
++			      venc_height_max(inst));
+ 
+ 	pixmp->width = ALIGN(pixmp->width, 128);
+ 	pixmp->height = ALIGN(pixmp->height, 32);
+@@ -458,10 +485,10 @@
+ 		return -EINVAL;
+ 
+ 	fsize->stepwise.min_width = frame_width_min(inst);
+-	fsize->stepwise.max_width = frame_width_max(inst);
++	fsize->stepwise.max_width = venc_width_max(inst);
+ 	fsize->stepwise.step_width = frame_width_step(inst);
+ 	fsize->stepwise.min_height = frame_height_min(inst);
+-	fsize->stepwise.max_height = frame_height_max(inst);
++	fsize->stepwise.max_height = venc_height_max(inst);
+ 	fsize->stepwise.step_height = frame_height_step(inst);
+ 
+ 	return 0;
+@@ -491,9 +518,9 @@
+ 	if (!fival->width || !fival->height)
+ 		return -EINVAL;
+ 
+-	if (fival->width > frame_width_max(inst) ||
++	if (fival->width > venc_width_max(inst) ||
+ 	    fival->width < frame_width_min(inst) ||
+-	    fival->height > frame_height_max(inst) ||
++	    fival->height > venc_height_max(inst) ||
+ 	    fival->height < frame_height_min(inst))
+ 		return -EINVAL;
+ 
