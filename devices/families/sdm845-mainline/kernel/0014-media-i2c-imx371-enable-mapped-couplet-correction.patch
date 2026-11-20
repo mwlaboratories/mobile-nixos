@@ -1,0 +1,23 @@
+From: mwlaboratories <info@mwlabs.be>
+Subject: [PATCH] media: i2c: imx371: enable mapped couplet correction
+
+The IMX371 front camera of the OnePlus 6 shows a regular dot lattice
+(about 8 px period) over the whole image. Its register table disables
+mapped couplet correction (CCS 0x0B05, the sensor's correction of the
+factory mapped pixel pairs, where the phase detection pixels sit), while
+the IMX376 table, whose images show no such pattern, enables it. Enable
+it for the IMX371 too.
+
+Status: hypothesis until tested on the OnePlus 6.
+---
+--- a/drivers/media/i2c/imx371.c
++++ b/drivers/media/i2c/imx371.c
+@@ -330,7 +330,7 @@
+ 	{CCI_REG8(0x3617), 0x66},
+ 	{CCI_REG8(0x0106), 0x00},
+ 	{CCI_REG8(0x0B00), 0x00},
+-	{CCI_REG8(0x0B05), 0x00},
++	{CCI_REG8(0x0B05), 0x01},	/* mapped couplet (PDAF pixel) correction */
+ 	{CCI_REG8(0x0B06), 0x00},
+ 	{CCI_REG8(0x3230), 0x00},
+ 	{CCI_REG8(0x3602), 0x00},
