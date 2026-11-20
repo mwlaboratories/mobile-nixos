@@ -1,0 +1,37 @@
+From: mwlaboratories <info@mwlabs.be>
+Subject: [PATCH] slimbus: qcom-ngd-ctrl: don't remove channels on stream disable
+
+7.4 gives the NGD controller a disable_stream that sends CH_REMOVE and
+RECONFIG_NOW for the stream's channels every time a SLIMbus stream
+stops. The 7.1 tree postmarketOS ships has none, and the OnePlus 6
+microphone (WCD934x TX over SLIMbus) works there. On 7.4 SLIMbus
+capture returns exact digital zeros.
+
+Don't register it, so stopping a stream leaves the channels as on 7.1.
+Hypothesis: the only behavioural difference on the SLIMbus path
+between the two trees.
+---
+--- a/drivers/slimbus/qcom-ngd-ctrl.c
++++ b/drivers/slimbus/qcom-ngd-ctrl.c
+@@ -1091,7 +1091,7 @@
+ 	return ret;
+ }
+ 
+-static int qcom_slim_ngd_disable_stream(struct slim_stream_runtime *rt)
++static int __maybe_unused qcom_slim_ngd_disable_stream(struct slim_stream_runtime *rt)
+ {
+ 	struct slim_device *sdev = rt->dev;
+ 	struct slim_controller *ctrl = sdev->ctrl;
+@@ -1702,7 +1702,11 @@
+ 	ctrl->ctrl.clkgear = SLIM_MAX_CLK_GEAR;
+ 	ctrl->ctrl.get_laddr = qcom_slim_ngd_get_laddr;
+ 	ctrl->ctrl.enable_stream = qcom_slim_ngd_enable_stream;
+-	ctrl->ctrl.disable_stream = qcom_slim_ngd_disable_stream;
++	/*
++	 * No disable_stream: removing the channels from the frame when a
++	 * stream stops is new in 7.4 and suspected of leaving SLIMbus
++	 * capture silent on the OnePlus 6 (7.1 had none, mic works there).
++	 */
+ 	ctrl->ctrl.xfer_msg = qcom_slim_ngd_xfer_msg;
+ 	ctrl->ctrl.wakeup = NULL;
+ 	ctrl->state = QCOM_SLIM_NGD_CTRL_DOWN;

@@ -241,6 +241,8 @@ mobile-nixos.kernel-builder {
     ./0008-ASoC-qdsp6-q6voice-move-a-running-call-to-a-new-port.patch
     # Venus encoder: let the device cap the frame size (encodes above 720p stall).
     ./0009-media-venus-venc-optional-ceiling-on-the-input-frame-size.patch
+    # Microphone: SLIMbus capture gives exact zeros on 7.4 (hypothesis).
+    ./0010-slimbus-qcom-ngd-ctrl-no-disable_stream-hypothesis.patch
   ];
 
   nativeBuildInputs = [ buildPackages.python3 buildPackages.zstd buildPackages.kmod ];
