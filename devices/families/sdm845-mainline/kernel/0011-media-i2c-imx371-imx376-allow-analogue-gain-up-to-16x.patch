@@ -1,0 +1,33 @@
+From: mwlaboratories <info@mwlabs.be>
+Subject: [PATCH] media: i2c: imx371, imx376: allow analogue gain up to 16x
+
+Both drivers cap the analogue gain code at 480. These sensors take
+1024 / (1024 - code), so 480 is only about 1.9x and the cameras stay
+dark in low light. The OnePlus OxygenOS sensor library clamps the code
+at 960, which is 16x; the OnePlus 6T postmarketOS camera stack
+(github.com/lolren/oneplus6t-pmos-fixes) raises the limit the same way.
+
+Status: hypothesis until tested on the OnePlus 6.
+---
+--- a/drivers/media/i2c/imx371.c
++++ b/drivers/media/i2c/imx371.c
+@@ -35,7 +35,7 @@
+ 
+ /* Analog gain control */
+ #define IMX371_ANA_GAIN_MIN		0
+-#define IMX371_ANA_GAIN_MAX		480
++#define IMX371_ANA_GAIN_MAX		960
+ #define IMX371_ANA_GAIN_STEP		1
+ #define IMX371_ANA_GAIN_DEFAULT		0x0
+ 
+--- a/drivers/media/i2c/imx376.c
++++ b/drivers/media/i2c/imx376.c
+@@ -35,7 +35,7 @@
+ 
+ /* Analog gain control */
+ #define IMX376_ANA_GAIN_MIN		0
+-#define IMX376_ANA_GAIN_MAX		480
++#define IMX376_ANA_GAIN_MAX		960
+ #define IMX376_ANA_GAIN_STEP		1
+ #define IMX376_ANA_GAIN_DEFAULT		0x0
+ 

@@ -244,6 +244,8 @@ mobile-nixos.kernel-builder {
     # Microphone: capture records zeros without the codec MCLK (fanzu8,
     # github.com/fanzu8/pmos-device-fixes, verified on 6.16.7).
     ./0010-ASoC-codecs-wcd934x-enable-MCLK-for-the-capture-path.patch
+    # Front and second rear camera: analogue gain capped at ~1.9x (code 480).
+    ./0011-media-i2c-imx371-imx376-allow-analogue-gain-up-to-16x.patch
   ];
 
   nativeBuildInputs = [ buildPackages.python3 buildPackages.zstd buildPackages.kmod ];
