@@ -34,6 +34,28 @@
     pkgs.sdm845-alsa-ucm
   ];
 
+  # Stream settings postmarketOS sets for every Qualcomm device (soc-qcom
+  # 51-qcom.conf; the reason isn't documented there). Part of the setup
+  # with working audio on this phone. It matches all ALSA nodes as pmOS
+  # does, so a USB sound card also gets the larger buffer.
+  services.pipewire.wireplumber.extraConfig."51-qcom" = {
+    "monitor.alsa.rules" = [
+      {
+        matches = [
+          { "node.name" = "~alsa_input.*"; }
+          { "node.name" = "~alsa_output.*"; }
+        ];
+        actions.update-props = {
+          "audio.format" = "S16LE";
+          "audio.rate" = 48000;
+          "api.alsa.period-size" = 4096;
+          "api.alsa.period-num" = 6;
+          "api.alsa.headroom" = 512;
+        };
+      }
+    ];
+  };
+
   # Call audio. The modem's voice stream runs inside the ADSP (q6voice):
   # the UCM "Voice Call" verb only sets the routes, and the DSP voice
   # session starts once something opens the VoiceMMode1 PCM for playback
