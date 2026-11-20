@@ -1,0 +1,60 @@
+From: mwlaboratories <info@mwlabs.be>
+Subject: [PATCH] media: venus: venc: signal EOS with a real buffer
+
+V4L2_ENC_CMD_STOP queues an empty input buffer flagged EOS whose device
+address is the made-up 0xdeadb000. The firmware may validate that
+address: on the OnePlus 6 it answered with "session error: event
+id:1001 (deadb000)", a fatal session error, and the next STREAMOFF hung.
+
+The decoder already allocates a small real DMA buffer for its EOS for
+this reason. Do the same in the encoder, and free it on close.
+
+Status: hypothesis until tested on the OnePlus 6 (sdm845, venus 5.2).
+---
+--- a/drivers/media/platform/qcom/venus/venc.c
++++ b/drivers/media/platform/qcom/venus/venc.c
+@@ -22,6 +22,7 @@
+ #include "pm_helpers.h"
+ 
+ #define NUM_B_FRAMES_MAX	4
++#define VENC_EOS_BUF_SIZE	SZ_4K
+ 
+ /*
+  * Three resons to keep MPLANE formats (despite that the number of planes
+@@ -546,9 +547,25 @@
+ 		if (!(inst->streamon_out && inst->streamon_cap))
+ 			goto unlock;
+ 
++		/*
++		 * Firmware may validate the address of the EOS buffer, so
++		 * hand it a real one rather than a made-up address (as vdec).
++		 */
++		if (!inst->eos_va) {
++			inst->eos_va = dma_alloc_attrs(inst->core->dev,
++						       VENC_EOS_BUF_SIZE,
++						       &inst->eos_da, GFP_KERNEL,
++						       DMA_ATTR_NO_KERNEL_MAPPING);
++			if (!inst->eos_va) {
++				ret = -ENOMEM;
++				goto unlock;
++			}
++		}
++
+ 		fdata.buffer_type = HFI_BUFFER_INPUT;
+ 		fdata.flags |= HFI_BUFFERFLAG_EOS;
+-		fdata.device_addr = 0xdeadb000;
++		fdata.device_addr = inst->eos_da;
++		fdata.alloc_len = VENC_EOS_BUF_SIZE;
+ 
+ 		ret = hfi_session_process_buf(inst, &fdata);
+ 
+@@ -1550,6 +1567,9 @@
+ 	venc_pm_get(inst);
+ 	venus_close_common(inst, file);
+ 	inst->enc_state = VENUS_ENC_STATE_DEINIT;
++	if (inst->eos_va)
++		dma_free_attrs(inst->core->dev, VENC_EOS_BUF_SIZE, inst->eos_va,
++			       inst->eos_da, DMA_ATTR_NO_KERNEL_MAPPING);
+ 	venc_pm_put(inst, false);
+ 
+ 	kfree(inst);

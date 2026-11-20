@@ -236,6 +236,7 @@ mobile-nixos.kernel-builder {
     ./0005-Input-pm8941-pwrkey-drop-repeated-release-after-wake.patch
     # Venus encoder on 7.4: no frames out, then a firmware fault at EOS.
     ./0006-media-venus-venc-size-input-buffers-to-firmware-requirement.patch
+    ./0007-media-venus-venc-signal-EOS-with-a-real-buffer.patch
   ];
 
   nativeBuildInputs = [ buildPackages.python3 buildPackages.zstd buildPackages.kmod ];
