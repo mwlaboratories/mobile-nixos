@@ -1,0 +1,80 @@
+From: mwlaboratories <info@mwlabs.be>
+Subject: [PATCH] ASoC: qdsp6: q6voice: move a running call to a new port
+
+The CVP session is created with the AFE ports of the voice path, and
+q6voice_set_port() only stores the new port. A call that is moved to
+another port by the mixer (OnePlus 6: earpiece on SLIMBUS_0_RX, speaker
+on QUAT_MI2S_RX) therefore keeps sending to the old port, which DPCM has
+just shut down: speakerphone during a call is silent.
+
+When the port of a running path changes, stop the path, release the CVP
+session and start the path again, which creates the CVP session on the
+new port. A port cleared to 0 is the first half of a move (UCM switches
+the old route off before the new one on), so wait for the new port.
+
+The new CVP session starts before DPCM prepares the new back end, the
+same order as at call start (FE startup before BE prepare).
+
+q6voice_path_stop() returns early without a CVP session, so a failed
+move does not oops at the end of the call.
+---
+--- a/sound/soc/qcom/qdsp6/q6voice.c
++++ b/sound/soc/qcom/qdsp6/q6voice.c
+@@ -176,6 +176,10 @@
+ 
+ 	dev_dbg(dev, "stop path %d\n", p->type);
+ 
++	/* A failed move to another port leaves no CVP session behind. */
++	if (!mvm || !cvp)
++		return;
++
+ 	ret = q6mvm_start(mvm, false);
+ 	if (ret)
+ 		dev_err(dev, "failed to stop voice: %d\n", ret);
+@@ -296,11 +300,42 @@
+ 		      bool capture, int index)
+ {
+ 	struct q6voice_path *p = &v->paths[path];
++	int *port = capture ? &p->tx_port : &p->rx_port;
++	struct q6voice_session *cvp;
++	int ret;
+ 
+-	if (capture)
+-		p->tx_port = index;
+-	else
+-		p->rx_port = index;
++	mutex_lock(&p->lock);
++	if (*port == index)
++		goto out;
++	*port = index;
++
++	/*
++	 * The CVP session is created with the AFE ports of the path, so a
++	 * running call stays on its old port when the mixer moves it (e.g.
++	 * from the earpiece to the speaker). Re-create the session on the new
++	 * port. A port cleared to 0 is the first half of such a move (the old
++	 * route is switched off before the new one is switched on): wait for
++	 * the new port.
++	 */
++	if (!index || !p->runtime || p->runtime->started != 3)
++		goto out;
++
++	dev_dbg(v->dev, "move path %d %s to port %d\n", path,
++		capture ? "tx" : "rx", index);
++
++	cvp = p->runtime->sessions[Q6VOICE_SERVICE_CVP];
++	if (cvp) {
++		q6voice_path_stop(p);
++		q6voice_session_release(cvp);
++		p->runtime->sessions[Q6VOICE_SERVICE_CVP] = NULL;
++	}
++
++	ret = q6voice_path_start(p);
++	if (ret)
++		dev_err(v->dev, "failed to move path %d to port %d: %d\n",
++			path, index, ret);
++out:
++	mutex_unlock(&p->lock);
+ }
+ EXPORT_SYMBOL_GPL(q6voice_set_port);
+ 
