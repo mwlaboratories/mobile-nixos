@@ -234,8 +234,6 @@ mobile-nixos.kernel-builder {
     ./0004-wip-enable-OTG-vbus.patch # 5f71fe8e: dual power role + vbus-supply
     # A power key press that wakes the phone was reported twice.
     ./0005-Input-pm8941-pwrkey-drop-repeated-release-after-wake.patch
-    # Every warm restart ended in Qualcomm crashdump (v6.4 restarted fine).
-    ./0006-firmware-qcom-scm-leave-SDI-and-dload-cookie-alone-at-probe.patch
   ];
 
   nativeBuildInputs = [ buildPackages.python3 buildPackages.zstd buildPackages.kmod ];
