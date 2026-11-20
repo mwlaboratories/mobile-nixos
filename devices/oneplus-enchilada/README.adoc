@@ -21,7 +21,6 @@ of firmwares are present on-device where relevant. This is important as it is
 possible to have different versions flashed to different slots. This is why so
 many persons online have “only one slot that works”.
 
-
 ==== Prepare for mainline
 
 [NOTE]
@@ -36,9 +35,16 @@ You will need to erase the `dtbo` partitions for either slots.
  $ fastboot erase dtbo_b
 ```
 
-
 ==== Dual booting
 
 This is not supported. Refer to other non-Android Linux instructions and
 adapt as needed. Here be snapdragons.
 
+=== Known issues
+
+==== Wi-Fi after restarting rmtfs
+
+The Wi-Fi firmware runs on the modem, which rmtfs stops and starts. After a
+runtime `systemctl restart rmtfs` (also when a switch restarts it), ath10k
+fails to come back (`failed to connect htt (-110)`) and Wi-Fi stays off until
+the next reboot. Reboots and shutdowns are not affected.
