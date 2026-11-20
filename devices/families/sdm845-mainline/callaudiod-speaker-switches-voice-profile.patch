@@ -1,0 +1,93 @@
+--- a/src/cad-pulse.c
++++ b/src/cad-pulse.c
+@@ -1025,6 +1025,72 @@
+         free(operation);
+ }
+ 
++/*
++ * PipeWire's ACP never puts two UCM devices with the same PlaybackPCM into
++ * one profile, so a card whose earpiece and speaker share a PCM (OnePlus 6:
++ * MultiMedia1) gets "Voice Call (Earpiece, ...)" and "Voice Call (Speaker,
++ * ...)" profiles with one port each, instead of one sink with both ports.
++ * In call mode, switch between those profiles; otherwise fall back to
++ * switching the sink port.
++ */
++static void set_speaker_profile(pa_context *ctx, const pa_card_info *info, int eol, void *data)
++{
++    CadPulseOperation *operation = data;
++    pa_card_profile_info2 *active, *target = NULL;
++    pa_operation *op = NULL;
++    guint i;
++
++    if (eol != 0)
++        return;
++
++    if (!info || info->index != operation->pulse->card_id) {
++        operation_complete_cb(ctx, 0, operation);
++        return;
++    }
++
++    active = info->active_profile2;
++    if (!active || !g_str_has_prefix(active->name, SND_USE_CASE_VERB_VOICECALL)) {
++        /* Not in call mode: switch the sink port as before */
++        op = pa_context_get_sink_info_by_index(ctx, operation->pulse->sink_id,
++                                               set_output_port, operation);
++        if (op)
++            pa_operation_unref(op);
++        return;
++    }
++
++    for (i = 0; i < info->n_profiles; i++) {
++        pa_card_profile_info2 *profile = info->profiles2[i];
++        gboolean has_speaker = g_strrstr(profile->name, "Speaker") != NULL;
++
++        if (!profile->available ||
++            !g_str_has_prefix(profile->name, SND_USE_CASE_VERB_VOICECALL) ||
++            has_speaker != !!operation->value)
++            continue;
++        if (!target || profile->priority > target->priority)
++            target = profile;
++    }
++
++    if (!target) {
++        g_debug("no Voice Call profile %s speaker", operation->value ? "with" : "without");
++        /* Maybe the speaker is a port of the current sink */
++        op = pa_context_get_sink_info_by_index(ctx, operation->pulse->sink_id,
++                                               set_output_port, operation);
++    } else if (g_strcmp0(target->name, active->name) != 0) {
++        g_debug("switching to voice profile '%s'", target->name);
++        op = pa_context_set_card_profile_by_index(ctx, operation->pulse->card_id,
++                                                  target->name,
++                                                  operation_complete_cb, operation);
++    } else {
++        operation_complete_cb(ctx, 1, operation);
++        return;
++    }
++
++    if (op)
++        pa_operation_unref(op);
++    else
++        operation_complete_cb(ctx, 0, operation);
++}
++
+ void cad_pulse_enable_speaker(gboolean enable, CadOperation *cad_op)
+ {
+     CadPulseOperation *operation = g_new(CadPulseOperation, 1);
+@@ -1050,9 +1116,14 @@
+     operation->op = cad_op;
+     operation->value = (guint)enable;
+ 
+-    op = pa_context_get_sink_info_by_index(operation->pulse->ctx,
+-                                           operation->pulse->sink_id,
+-                                           set_output_port, operation);
++    if (operation->pulse->has_voice_profile)
++        op = pa_context_get_card_info_by_index(operation->pulse->ctx,
++                                               operation->pulse->card_id,
++                                               set_speaker_profile, operation);
++    else
++        op = pa_context_get_sink_info_by_index(operation->pulse->ctx,
++                                               operation->pulse->sink_id,
++                                               set_output_port, operation);
+     if (op)
+         pa_operation_unref(op);
+ 

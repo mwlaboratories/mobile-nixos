@@ -11,6 +11,18 @@ in
 {
   nixpkgs.overlays = [
     (self: super: {
+      # Speakerphone in calls: PipeWire gives the OnePlus 6 separate
+      # "Voice Call (Earpiece, Mic)" and "Voice Call (Speaker, Mic)"
+      # profiles (one PCM, so never two ports of one sink); the speaker
+      # button switches between them instead of between ports.
+      callaudiod = super.callaudiod.overrideAttrs (old: {
+        patches = (old.patches or [ ]) ++ [ ./callaudiod-speaker-switches-voice-profile.patch ];
+      });
+      # GNOME Calls links libcallaudio and is rebuilt with it. Its test
+      # suite needs user namespaces (bwrap), which an emulated aarch64
+      # build sandbox doesn't provide; the tests don't cover callaudiod.
+      calls = super.calls.overrideAttrs { doCheck = false; };
+
       sdm845-alsa-ucm = self.callPackage (
         { runCommand, fetchFromGitLab }:
 
