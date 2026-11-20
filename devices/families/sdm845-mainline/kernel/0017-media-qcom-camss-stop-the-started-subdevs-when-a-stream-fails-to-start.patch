@@ -1,0 +1,60 @@
+From: mwlaboratories <info@mwlabs.be>
+Subject: [PATCH] media: qcom: camss: stop the started subdevs when a stream fails to start
+
+video_start_streaming() starts the subdevs from the VFE up to the sensor
+and, when one fails, only stops the media pipeline. The subdevs started
+before the failing one (VFE, CSID, CSIPHY when the sensor fails, for
+instance on a CCI timeout) stay marked as streaming. The next start then
+skips them (WARN in call_s_stream(): already started) and the stream
+gets no frames until a stop clears the state.
+
+Seen on the OnePlus 6: "imx519 16-001a: Error writing reg 0x0136: -110"
+followed by three call_s_stream() warnings at the next start.
+
+Stop the subdevs already started before stopping the pipeline.
+
+Status: compile-tested; the failure path was observed on the OnePlus 6.
+---
+diff --git a/drivers/media/platform/qcom/camss/camss-video.c b/drivers/media/platform/qcom/camss/camss-video.c
+index 0852eb6..f0f77b1 100644
+--- a/drivers/media/platform/qcom/camss/camss-video.c
++++ b/drivers/media/platform/qcom/camss/camss-video.c
+@@ -253,9 +253,11 @@ static int video_start_streaming(struct vb2_queue *q, unsigned int count)
+ {
+ 	struct camss_video *video = vb2_get_drv_priv(q);
+ 	struct video_device *vdev = &video->vdev;
++	struct v4l2_subdev *started[8];
+ 	struct media_entity *entity;
+ 	struct media_pad *pad;
+ 	struct v4l2_subdev *subdev;
++	unsigned int i, n = 0;
+ 	int ret;
+ 
+ 	ret = video_device_pipeline_alloc_start(vdev);
+@@ -282,12 +284,24 @@ static int video_start_streaming(struct vb2_queue *q, unsigned int count)
+ 		subdev = media_entity_to_v4l2_subdev(entity);
+ 
+ 		ret = v4l2_subdev_call(subdev, video, s_stream, 1);
+-		if (ret < 0 && ret != -ENOIOCTLCMD)
+-			goto error;
++		if (ret == -ENOIOCTLCMD)
++			continue;
++		if (ret < 0)
++			goto error_stop;
++		if (n < ARRAY_SIZE(started))
++			started[n++] = subdev;
+ 	}
+ 
+ 	return 0;
+ 
++error_stop:
++	/*
++	 * Stop the subdevs already started (VFE, CSID, CSIPHY when the sensor
++	 * fails to start), or they stay marked as streaming: the next start
++	 * then skips them (WARN in call_s_stream) and gets no frames.
++	 */
++	for (i = 0; i < n; i++)
++		v4l2_subdev_call(started[i], video, s_stream, 0);
+ error:
+ 	video_device_pipeline_stop(vdev);
+ 

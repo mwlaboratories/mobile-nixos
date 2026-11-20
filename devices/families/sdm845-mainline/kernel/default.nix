@@ -257,6 +257,9 @@ mobile-nixos.kernel-builder {
     # Front camera: 2304x1728 2x2 binned full-FOV mode (quad Bayer sensor;
     # the full mode needs a remosaic we don't have). Stock register values.
     ./0016-media-i2c-imx371-add-a-2x2-binned-full-field-of-view-mode.patch
+    # Cameras: a failed stream start left VFE/CSID/CSIPHY marked streaming,
+    # so the next start got no frames.
+    ./0017-media-qcom-camss-stop-the-started-subdevs-when-a-stream-fails-to-start.patch
   ];
 
   nativeBuildInputs = [ buildPackages.python3 buildPackages.zstd buildPackages.kmod ];
