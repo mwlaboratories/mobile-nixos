@@ -128,6 +128,11 @@ in
         after = [ "ModemManager.service" "qrtr-ns.service" ];
         wants = [ "ModemManager.service" ];
         requires = [ "qrtr-ns.service" ];
+        # 81voltd reports finding the modem (at startup or when ModemManager
+        # re-adds it after a restart) and the modem's IMS requests with
+        # g_info(), which GLib drops unless asked: without this the journal
+        # shows only the failures.
+        environment.G_MESSAGES_DEBUG = "all";
         serviceConfig = {
           Restart = "on-failure";
           RestartSec = 5;
