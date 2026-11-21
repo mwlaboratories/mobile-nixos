@@ -8,6 +8,17 @@
 }:
 
 let
+  # Rust toolchain for CONFIG_RUST (7.4 has only the Rust binder driver,
+  # which Waydroid needs). Kconfig probes rustc/bindgen/RUST_LIB_SRC both
+  # when the config is made and again in the kernel build's oldconfig;
+  # without them it silently drops RUST and the binder with it. Same
+  # wiring as nixpkgs' kernel/build.nix.
+  rustTools = [
+    buildPackages.rustc-unwrapped
+    buildPackages.rust-bindgen-unwrapped
+  ];
+  rustLibSrc = buildPackages.rustPlatform.rustLibSrc;
+
   # sdm845-linus (7.4-rc3). The final kernel.release has no "-sdm845" suffix
   # (the build checks modDirVersion against it).
   version = "7.4.0-rc3";
@@ -36,7 +47,9 @@ let
       buildPackages.flex
       buildPackages.perl
       buildPackages.python3
-    ];
+    ] ++ rustTools;
+
+    env.RUST_LIB_SRC = rustLibSrc;
 
     buildPhase = ''
             export ARCH=arm64
@@ -205,6 +218,38 @@ let
       CONFIG_HID_LOGITECH_DJ=m
       CONFIG_HID_LOGITECH_HIDPP=m
 
+      # Waydroid. 7.4 removed the C binder; the Rust one is built in only
+      # and always includes binderfs. No devices at boot: waydroid mounts
+      # binderfs and allocates binder/vndbinder/hwbinder itself. Android
+      # 11+ images use memfd (MEMFD_CREATE=y) instead of ashmem. PSI,
+      # BRIDGE, VETH, namespaces and cgroups were already on.
+      CONFIG_RUST=y
+      CONFIG_ANDROID_BINDER_IPC_RUST=y
+      CONFIG_ANDROID_BINDER_DEVICES=""
+      # waydroid-net.sh prefers iptables-legacy when it is on PATH (it is, in
+      # nixpkgs' iptables): NAT for the container (MASQUERADE), DHCP/DNS
+      # ACCEPTs (filter) and the DHCP checksum fix (mangle, CHECKSUM). The
+      # targets also serve iptables-nft through NFT_COMPAT.
+      CONFIG_NETFILTER_XTABLES_LEGACY=y
+      CONFIG_IP_NF_IPTABLES_LEGACY=y
+      CONFIG_IP_NF_FILTER=y
+      CONFIG_IP_NF_NAT=y
+      CONFIG_IP_NF_MANGLE=y
+      CONFIG_IP6_NF_IPTABLES=y
+      CONFIG_IP6_NF_IPTABLES_LEGACY=y
+      CONFIG_IP6_NF_FILTER=y
+      CONFIG_IP6_NF_NAT=y
+      CONFIG_IP6_NF_MANGLE=y
+      CONFIG_NETFILTER_XT_NAT=y
+      CONFIG_NETFILTER_XT_TARGET_MASQUERADE=y
+      CONFIG_NETFILTER_XT_TARGET_CHECKSUM=y
+
+      # Suspend testing: /sys/power/pm_test walks the suspend path without
+      # sleeping (a crash there costs a Power+VolUp), and
+      # /sys/power/pm_wakeup_irq tells what woke the phone.
+      CONFIG_PM_DEBUG=y
+      CONFIG_PM_SLEEP_DEBUG=y
+
       # Disable LOCALVERSION_AUTO to make modDirVersion predictable
       CONFIG_LOCALVERSION_AUTO=n
       EOF
@@ -266,7 +311,11 @@ mobile-nixos.kernel-builder {
     ./0018-media-i2c-imx519-let-the-supplies-settle-and-reset-after-power-up.patch
   ];
 
-  nativeBuildInputs = [ buildPackages.python3 buildPackages.zstd buildPackages.kmod ];
+  nativeBuildInputs = [ buildPackages.python3 buildPackages.zstd buildPackages.kmod ] ++ rustTools;
+
+  RUST_LIB_SRC = rustLibSrc;
+  # Keep the Rust source path out of the binary (no false runtime reference).
+  KRUSTFLAGS = "--remap-path-prefix ${rustLibSrc}=/";
 
   # Skip "install" (zinstall for boot files) but keep modules_install (runs depmod)
   installTargets = [ "modules_install" ];
