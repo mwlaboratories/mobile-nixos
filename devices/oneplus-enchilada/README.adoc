@@ -85,6 +85,11 @@ downlink call audio yet. VoLTE and 5G do not work.
 The microphone and speaker work, as do the sensors and screen rotation, USB-C
 OTG, and the stage-2 USB gadget.
 
+The stage-2 USB gadget is opt-in, like `mobile.adbd`: it gives root ssh
+(`ssh root@172.16.42.1`) and a serial console (`/dev/ttyACM0` on a Linux
+host) over the cable. Turn it on in your configuration with
+`mobile.usb.stage-2.enable = true;`.
+
 The fingerprint sensor is not supported: it sits behind QSEE, and its trusted
 applications (fpc1228, gfp5288) are on the vendor partition.
 

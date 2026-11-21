@@ -72,9 +72,6 @@
     "pstore.kmsg_bytes=65536"
   ];
 
-  # NCM network (172.16.42.1) + ACM serial console once booted.
-  mobile.usb.stage-2.enable = lib.mkDefault true;
-
   # No factory WiFi MAC reaches mainline (postmarketOS uses bootmac), so the
   # address is random per boot and DHCP hands out a new lease after each
   # reboot. "stable" derives one from the machine-id and the connection.
