@@ -8,6 +8,7 @@ let
     types
   ;
   cfg = config.mobile.usb.stage-2;
+  nm = config.networking.networkmanager;
   inherit (config.mobile.device) identity;
   inherit (config.networking) hostName;
 
@@ -36,10 +37,14 @@ in
       description = ''
         Configure a USB gadget in stage-2 (the booted system) with:
 
-         - an NCM network function (usb0). With NetworkManager enabled, the
-           device takes `address` and hands the host an address by DHCP
-           ("shared" connection), so `ssh root@172.16.42.1` works without WiFi.
-           Without NetworkManager, usb0 is left for you to configure.
+         - an NCM network function (usb0). With NetworkManager or
+           `networking.useNetworkd`, systemd-networkd manages usb0: the device
+           takes `address` and hands the host an address by DHCP, without a
+           default route or DNS, so `ssh root@172.16.42.1` works without WiFi
+           and the host keeps its own internet. Next to NetworkManager,
+           networkd only handles usb0, and NetworkManager leaves usb0
+           unmanaged (no "Wired" connection in the shell). With scripted
+           networking, usb0 is left for you to configure.
          - an ACM serial function with a getty on /dev/ttyGS0 (on a Linux
            host: /dev/ttyACM0).
 
@@ -60,8 +65,8 @@ in
       type = types.str;
       default = "172.16.42.1/24";
       description = ''
-        Address (with prefix length) of the device on the USB network, when
-        NetworkManager manages it.
+        Address (with prefix length) of the device on the USB network. The
+        DHCP server hands the host an address from the same subnet.
       '';
     };
   };
@@ -90,7 +95,7 @@ in
         wantedBy = [ "multi-user.target" ];
         after = [ "sys-kernel-config.mount" ];
         requires = [ "sys-kernel-config.mount" ];
-        before = [ "NetworkManager.service" "serial-getty@ttyGS0.service" ];
+        before = [ "serial-getty@ttyGS0.service" ];
         path = [ pkgs.coreutils pkgs.findutils ];
         serviceConfig = {
           Type = "oneshot";
@@ -139,42 +144,56 @@ in
         requires = [ "usb-gadget.service" ];
       };
 
-      # DHCP/DNS from NetworkManager's dnsmasq to the host, and ssh over the link.
+      # DHCP from networkd to the host (udp 67), and ssh over the link.
       networking.firewall.trustedInterfaces = [ "usb0" ];
     })
 
-    (mkIf (cfg.enable && config.networking.networkmanager.enable) {
-      networking.networkmanager.ensureProfiles.profiles.usb-gadget = {
-        connection = {
-          id = "usb-gadget";
-          type = "ethernet";
-          interface-name = "usb0";
-          autoconnect = "true";
+    # usb0 belongs to systemd-networkd, which handles it on its own: it
+    # (re)configures the link whenever it appears or gets carrier, so a
+    # replug or a cable plugged in after boot needs nothing else. The rest of
+    # the system keeps whatever manages it (NetworkManager on a phone).
+    # Scripted networking is left alone: networkd next to it would change
+    # how NixOS sets up every other interface.
+    (mkIf (cfg.enable && (nm.enable || config.networking.useNetworkd)) {
+      systemd.network.enable = true;
+      systemd.network.networks."40-usb-gadget" = {
+        matchConfig.Name = "usb0";
+        address = [ cfg.address ];
+        networkConfig = {
+          DHCPServer = true;
+          LinkLocalAddressing = "no";
+          IPv6AcceptRA = false;
         };
-        ipv4 = {
-          method = "shared";
-          address1 = cfg.address;
+        # The USB link is for reaching the device (ssh), not for routing the
+        # host through it: a router or DNS option would give the host a
+        # default route and resolver via the device, which can win over the
+        # host's own network and dies with the device's uplink.
+        dhcpServerConfig = {
+          EmitRouter = false;
+          EmitDNS = false;
+          EmitNTP = false;
         };
-        ipv6.method = "ignore";
+        linkConfig.RequiredForOnline = "no";
       };
 
-      # The USB link is for reaching the device (ssh), not for routing the
-      # host through it: "shared" would otherwise hand the host a default
-      # route and DNS via the device, which can win over the host's own
-      # network and dies with the device's uplink. An option without data
-      # tells dnsmasq not to send it; requests are tagged with the interface
-      # they came in on, so other shared connections (a hotspot) keep theirs.
-      environment.etc."NetworkManager/dnsmasq-shared.d/usb-gadget.conf".text = ''
-        dhcp-option=tag:usb0,option:router
-        dhcp-option=tag:usb0,option:dns-server
-      '';
+      # NetworkManager's 85-nm-unmanaged.rules already unmanages every
+      # DEVTYPE=gadget interface; say it outright too, so NetworkManager
+      # neither fights networkd over usb0 nor shows it in the shell's network
+      # menus.
+      networking.networkmanager.unmanaged = [ "interface-name:usb0" ];
+    })
 
-      # NetworkManager's 85-nm-unmanaged.rules unmanages every DEVTYPE=gadget
-      # interface, so the profile above would never activate. Re-manage usb0;
-      # NetworkManager reads this when usb0 is added.
-      services.udev.extraRules = ''
-        SUBSYSTEM=="net", ACTION=="add|change", KERNEL=="usb0", ENV{DEVTYPE}=="gadget", ENV{NM_UNMANAGED}="0"
-      '';
+    # When networkd only runs for usb0 next to NetworkManager, keep it to usb0.
+    (mkIf (cfg.enable && nm.enable && !config.networking.useNetworkd) {
+      # It would wait for usb0 alone, which network-online.target doesn't need.
+      systemd.network.wait-online.enable = lib.mkDefault false;
+      # By default it deletes routes and policy rules it did not set up,
+      # NetworkManager's and VPNs' included.
+      systemd.network.config.networkConfig = {
+        ManageForeignRoutes = lib.mkDefault false;
+        ManageForeignRoutingPolicyRules = lib.mkDefault false;
+        ManageForeignNextHops = lib.mkDefault false;
+      };
     })
   ];
 }
