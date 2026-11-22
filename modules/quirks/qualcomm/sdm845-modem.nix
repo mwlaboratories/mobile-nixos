@@ -216,6 +216,36 @@ in
           ExecStart = "${pkgs.msm-modem}/libexec/msm-modem-uim-selection";
         };
       };
+      # The selection above runs once; a SIM inserted later stays unused
+      # (ModemManager: sim-missing) until it is run again and ModemManager
+      # restarted. This watches the modem's slot status indications and
+      # does both, only for a card without a provisioning session. See the
+      # script.
+      msm-modem-sim-hotplug = mkIf config.networking.modemmanager.enable {
+        description = "Activate a SIM card inserted while running";
+        wantedBy = [ "multi-user.target" ];
+        after = [ "msm-modem-uim-selection.service" "ModemManager.service" "qrtr-ns.service" ];
+        requires = [ "qrtr-ns.service" ];
+        serviceConfig = {
+          ExecStart = lib.getExe (pkgs.writeShellApplication {
+            name = "msm-modem-sim-hotplug";
+            runtimeInputs = [
+              pkgs.libqmi
+              config.networking.modemmanager.package
+              config.systemd.package
+              pkgs.coreutils
+              pkgs.gawk
+              pkgs.gnugrep
+            ];
+            text = ''
+              UIM_SELECTION=${pkgs.msm-modem}/libexec/msm-modem-uim-selection
+            '' + builtins.readFile ./msm-modem-sim-hotplug.sh;
+          });
+          # qmicli exits when the modem goes away (e.g. a modem restart).
+          Restart = "always";
+          RestartSec = 5;
+        };
+      };
     };
   };
 }
