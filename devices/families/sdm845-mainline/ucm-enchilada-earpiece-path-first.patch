@@ -1,0 +1,43 @@
+--- a/ucm2/OnePlus/enchilada/HiFi.conf
++++ b/ucm2/OnePlus/enchilada/HiFi.conf
+@@ -24,9 +24,15 @@
+ 		cset "name='VoiceMMode1 Capture Mixer SLIMBUS_0_TX' 1"
+ 		# Earpiece channel in AIF1_PB here too: q6voiced starts the voice
+ 		# streams at dialing, before callaudiod switches to "Voice Call",
+-		# and the codec fixes the stream's SLIMbus channels then. Silent
+-		# in HiFi: RX INT0 stays unrouted until the Earpiece device.
++		# and the codec fixes the stream's SLIMbus channels then.
++		# RX INT0 is routed as well, so the earpiece path is up when the
++		# voice stream starts: a SLIMbus RX port that receives while
++		# nothing reads it overflows ("overflow error on RX port 0"),
++		# which seems to keep the earpiece silent for the call. Only
++		# the voice stream uses SLIMBUS_0_RX in HiFi (no MultiMedia1).
+ 		cset "name='SLIM RX0 MUX' AIF1_PB"
++		cset "name='RX INT0_1 MIX1 INP0' RX0"
++		cset "name='RX INT0 DEM MUX' CLSH_DSM_OUT"
+ 
+ 		# Headphones
+ 		cset "name='SLIM RX2 MUX' AIF2_PB"
+--- a/ucm2/OnePlus/enchilada/VoiceCall.conf
++++ b/ucm2/OnePlus/enchilada/VoiceCall.conf
+@@ -49,14 +49,17 @@
+ 	Comment "Earpiece"
+ 
+ 	EnableSequence [
+-		# Call audio to the earpiece (back from the speaker)
+-		cset "name='SLIMBUS_0_RX Voice Mixer VoiceMMode1' 1"
++		# Earpiece path first, then the call audio (back from the
++		# speaker): the voice mixer starts the SLIMbus RX stream, and
++		# RX0 must have a reader by then (see HiFi.conf). The reverse
++		# order on disable.
+ 		cset "name='RX INT0_1 MIX1 INP0' RX0"
++		cset "name='SLIMBUS_0_RX Voice Mixer VoiceMMode1' 1"
+ 	]
+ 
+ 	DisableSequence [
+-		cset "name='RX INT0_1 MIX1 INP0' ZERO"
+ 		cset "name='SLIMBUS_0_RX Voice Mixer VoiceMMode1' 0"
++		cset "name='RX INT0_1 MIX1 INP0' ZERO"
+ 	]
+ 
+ 	Value {

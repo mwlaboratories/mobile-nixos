@@ -49,6 +49,10 @@ in
             # Calls: earpiece channel present when the voice streams start
             # under HiFi, and ADC gains set by the capture devices.
             ./ucm-enchilada-call-fixes.patch
+            # Earpiece silent in calls (speaker fine): RX INT0 routed
+            # before the voice stream starts on SLIMBUS_0_RX, and kept
+            # routed until it stops, so codec RX port 0 never overflows.
+            ./ucm-enchilada-earpiece-path-first.patch
           ];
         } ''
           mkdir -p $out/share/
